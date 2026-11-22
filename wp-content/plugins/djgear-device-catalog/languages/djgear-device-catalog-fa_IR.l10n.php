@@ -1,0 +1,2 @@
+<?php
+return ['domain'=>'djgear-device-catalog','plural-forms'=>'nplurals=2; plural=(n > 1);','language'=>'fa_IR','project-id-version'=>'DJGear Device Catalog 0.1.0','pot-creation-date'=>'2026-11-22T18:22:56+03:30','po-revision-date'=>'2026-11-22T18:22:56+03:30','messages'=>['DJGear Device Catalog'=>'کاتالوگ تجهیزات دی‌جی دی‌جی‌گیر','DJGear Device Catalog requires the DJGear Core plugin to be active.'=>'کاتالوگ تجهیزات دی‌جی به فعال بودن افزونه هسته دی‌جی‌گیر نیاز دارد.']];

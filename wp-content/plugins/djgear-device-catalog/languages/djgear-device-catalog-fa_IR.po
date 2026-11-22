@@ -1,0 +1,16 @@
+# Persian (fa_IR) translation for DJGear Device Catalog
+msgid ""
+msgstr ""
+"Project-Id-Version: DJGear Device Catalog 0.1.0\n"
+"Language: fa_IR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Domain: djgear-device-catalog\n"
+
+msgid "DJGear Device Catalog"
+msgstr "کاتالوگ تجهیزات دی‌جی دی‌جی‌گیر"
+
+msgid "DJGear Device Catalog requires the DJGear Core plugin to be active."
+msgstr "کاتالوگ تجهیزات دی‌جی به فعال بودن افزونه هسته دی‌جی‌گیر نیاز دارد."

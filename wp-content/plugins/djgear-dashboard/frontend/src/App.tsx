@@ -5,6 +5,10 @@ import { AppShell } from './components/layout/AppShell';
 import { PermissionDeniedState } from './components/ui/StateFeedback';
 import { I18nProvider } from './i18n/I18nContext';
 import { getRouteById, hasRoutePermission, type RouteId } from './navigation/routes';
+import { CatalogDevicesPage } from './pages/CatalogDevicesPage';
+import { CatalogImportExportPage } from './pages/CatalogImportExportPage';
+import { CatalogSkinsPage } from './pages/CatalogSkinsPage';
+import { CatalogTaxonomiesPage } from './pages/CatalogTaxonomiesPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { ModuleHubPage } from './pages/ModuleHubPage';
 import { ModulesPage } from './pages/ModulesPage';
@@ -50,6 +54,19 @@ export function App({ config, api: injectedApi, initialRoute = 'overview' }: App
         return <OrdersPage api={api} />;
       case 'customers':
         return <CustomersPage api={api} />;
+      case 'catalog-devices':
+        return (
+          <CatalogDevicesPage
+            api={api}
+            canManage={Boolean(config.currentUser.capabilities.djgear_manage_catalog)}
+          />
+        );
+      case 'catalog-taxonomies':
+        return <CatalogTaxonomiesPage api={api} />;
+      case 'catalog-skins':
+        return <CatalogSkinsPage api={api} />;
+      case 'catalog-import-export':
+        return <CatalogImportExportPage api={api} />;
       case 'modules':
         return <ModulesPage api={api} />;
       case 'settings':

@@ -1,0 +1,11 @@
+parameters:
+  level: 6
+  paths:
+    - src
+    - djgear-device-catalog.php
+  scanDirectories:
+    - ../djgear-core/src
+  scanFiles:
+    - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+  reportUnmatchedIgnoredErrors: false

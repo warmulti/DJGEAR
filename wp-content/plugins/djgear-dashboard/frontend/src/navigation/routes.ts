@@ -5,6 +5,10 @@ export type RouteId =
   | 'products'
   | 'orders'
   | 'customers'
+  | 'catalog-devices'
+  | 'catalog-taxonomies'
+  | 'catalog-skins'
+  | 'catalog-import-export'
   | 'sms'
   | 'email'
   | 'forms'
@@ -15,7 +19,7 @@ export type RouteId =
   | 'modules'
   | 'settings';
 
-export type NavGroupId = 'core' | 'commerce' | 'comms' | 'growth' | 'operations';
+export type NavGroupId = 'core' | 'commerce' | 'catalog' | 'comms' | 'growth' | 'operations';
 
 export interface RouteDefinition {
   id: RouteId;
@@ -31,6 +35,7 @@ export interface RouteDefinition {
 export const NAV_GROUPS: Array<{ id: NavGroupId; labelKey: TranslationKey }> = [
   { id: 'core', labelKey: 'navGroupCore' },
   { id: 'commerce', labelKey: 'navGroupCommerce' },
+  { id: 'catalog', labelKey: 'navGroupCatalog' },
   { id: 'comms', labelKey: 'navGroupComms' },
   { id: 'growth', labelKey: 'navGroupGrowth' },
   { id: 'operations', labelKey: 'navGroupOperations' },
@@ -68,6 +73,38 @@ export const ROUTES: RouteDefinition[] = [
     secondaryCapabilities: ['list_users', 'manage_woocommerce'],
     status: 'live',
     targetModuleId: 'djgear-crm',
+  },
+  {
+    id: 'catalog-devices',
+    group: 'catalog',
+    labelKey: 'navCatalogDevices',
+    requiredCapability: 'djgear_view_catalog',
+    status: 'live',
+    targetModuleId: 'djgear-device-catalog',
+  },
+  {
+    id: 'catalog-taxonomies',
+    group: 'catalog',
+    labelKey: 'navCatalogTaxonomies',
+    requiredCapability: 'djgear_manage_catalog',
+    status: 'live',
+    targetModuleId: 'djgear-device-catalog',
+  },
+  {
+    id: 'catalog-skins',
+    group: 'catalog',
+    labelKey: 'navCatalogSkins',
+    requiredCapability: 'djgear_manage_skin_definitions',
+    status: 'live',
+    targetModuleId: 'djgear-device-catalog',
+  },
+  {
+    id: 'catalog-import-export',
+    group: 'catalog',
+    labelKey: 'navCatalogImportExport',
+    requiredCapability: 'djgear_import_export_catalog',
+    status: 'live',
+    targetModuleId: 'djgear-device-catalog',
   },
   {
     id: 'sms',

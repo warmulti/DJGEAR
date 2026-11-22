@@ -160,6 +160,109 @@ export interface DjgearSettings {
   maintenance_notice: string;
 }
 
+export interface CatalogBrand {
+  id: number;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  logo_attachment_id: number | null;
+  logo_url: string | null;
+  country_code: string;
+  website_url: string;
+  device_count: number;
+}
+
+export interface CatalogCategory {
+  id: number;
+  slug: string;
+  parent_id: number;
+  name_fa: string;
+  name_en: string;
+  icon_key: string;
+  sort_order: number;
+  device_count: number;
+}
+
+export interface CatalogDevice {
+  id: number;
+  slug: string;
+  brand_term_id: number;
+  category_term_id: number;
+  brand: CatalogBrand | null;
+  category: CatalogCategory | null;
+  model_code: string;
+  canonical_key: string;
+  mpn: string | null;
+  name_fa: string;
+  name_en: string;
+  summary_fa: string;
+  summary_en: string;
+  release_year: number | null;
+  lifecycle_status: 'active' | 'discontinued' | 'upcoming' | 'draft';
+  skin_ready: boolean;
+  primary_wc_product_id: number | null;
+  hero_image_url: string | null;
+  updated_at: string;
+}
+
+export interface CatalogSpec {
+  id?: number;
+  spec_group: string;
+  spec_key: string;
+  label_fa: string;
+  label_en: string;
+  value_fa: string;
+  value_en: string;
+  value_type: string;
+  numeric_value?: number | null;
+  unit: string;
+  is_filterable: boolean;
+}
+
+export interface CatalogCompatibility {
+  id: number;
+  source_device_id: number;
+  target_type: 'device' | 'wc_product' | 'skin_definition';
+  target_id: number;
+  relation_type: string;
+  fit_confidence: string;
+  notes_fa: string;
+  notes_en: string;
+  wc_product?: { id: number; name: string; sku: string; price: string; currency: string };
+  device?: { id: number; slug: string; model_code: string; name_fa: string; name_en: string };
+}
+
+export interface CatalogSkinDefinition {
+  id: number;
+  primary_device_id: number;
+  compatible_device_ids: number[];
+  template_code: string;
+  template_version: string;
+  status: 'draft' | 'active' | 'deprecated';
+  width_mm: number;
+  height_mm: number;
+  bleed_mm: number;
+  min_dpi: number;
+  zones: Array<{ id: string; label_fa: string; label_en: string; required: boolean; printable: boolean }>;
+  supported_finishes: string[];
+  preview_attachment_id: number | null;
+  preview_image_url: string | null;
+  dieline_attachment_id?: number | null;
+  dieline_url?: string | null;
+  base_wc_product_id: number | null;
+  internal_notes?: string;
+  notes_fa: string;
+  notes_en: string;
+  updated_at: string;
+}
+
+export interface CatalogImportValidation {
+  valid: boolean;
+  schema_version: string;
+  summary: { total: number; create: number; update: number; skip: number; errors: number };
+  rows: Array<{ index: number; canonical_key?: string; model_code?: string; action: string; error?: string }>;
+}
+
 declare global {
   interface Window {
     DJGEAR_DASHBOARD_CONFIG?: DashboardBootConfig;

@@ -51,6 +51,20 @@ export class WpRestClient {
     });
   }
 
+  public async put<T>(path: string, body: Record<string, unknown>): Promise<ApiEnvelope<T>> {
+    const url = this.buildUrl(path);
+    return this.request<T>(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  public async delete<T>(path: string): Promise<ApiEnvelope<T>> {
+    const url = this.buildUrl(path);
+    return this.request<T>(url, { method: 'DELETE' });
+  }
+
   private buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
     const cleanPath = path.replace(/^\/+/, '');
     const url = new URL(`${this.baseUrl}/${cleanPath}`, window.location.origin);
