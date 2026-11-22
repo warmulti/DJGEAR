@@ -221,6 +221,15 @@ try {
     $admins = get_users(['role' => 'administrator', 'number' => 1]);
     wp_set_current_user($admins[0]->ID);
 
+    // Create a real WP attachment to test private dieline protection end-to-end
+    $dielineAttId = wp_insert_post([
+        'post_type'      => 'attachment',
+        'post_title'     => 'QA Private Dieline SVG',
+        'post_mime_type' => 'image/svg+xml',
+        'post_status'    => 'inherit',
+    ]);
+    $assert(is_int($dielineAttId) && $dielineAttId > 0, "Created temporary dieline attachment #{$dielineAttId}");
+
     $skinResp = $jsonPost('POST', '/djgear/v1/catalog/skins', [
         'primary_device_id'     => $flx4Id,
         'compatible_device_ids' => [$flx4Id, $ddj400Id],
@@ -235,13 +244,39 @@ try {
             ['id' => 'top-plate', 'label_en' => 'Top Plate', 'label_fa' => 'صفحه رویی', 'required' => true, 'printable' => true],
         ],
         'supported_finishes'    => ['matte', 'gloss', 'carbon'],
-        'dieline_attachment_id' => 999999,
+        'dieline_attachment_id' => $dielineAttId,
         'internal_notes'        => 'TOP-SECRET-DIELINE-OFFSET',
         'notes_en'              => 'Precision vinyl cut',
         'notes_fa'              => 'برش دقیق وینیل',
     ]);
     $assert($skinResp->get_status() === 201, 'Administrator POST /catalog/skins creates multi-device skin definition (201)');
     $skinId = (int) ($skinResp->get_data()['data']['skin']['id'] ?? 0);
+
+    // Verify private dieline security across Media URL, WP REST wp/v2/media, and gated /dieline endpoint
+    $assert(wp_get_attachment_url($dielineAttId) === false, 'Private dieline attachment returns false (no direct URL) from wp_get_attachment_url()');
+    $assert(rest_do_request(new WP_REST_Request('GET', "/djgear/v1/catalog/skins/{$skinId}/dieline"))->get_status() === 200, 'Administrator GET /catalog/skins/{id}/dieline returns 200');
+    wp_set_current_user($smId);
+    $assert(rest_do_request(new WP_REST_Request('GET', "/djgear/v1/catalog/skins/{$skinId}/dieline"))->get_status() === 403, 'Shop Manager GET /catalog/skins/{id}/dieline returns 403');
+    wp_set_current_user(0);
+    $assert(rest_do_request(new WP_REST_Request('GET', "/djgear/v1/catalog/skins/{$skinId}/dieline"))->get_status() === 401, 'Unauthenticated GET /catalog/skins/{id}/dieline returns 401');
+    $mediaGuardStatus = rest_do_request(new WP_REST_Request('GET', "/wp/v2/media/{$dielineAttId}"))->get_status();
+    $assert(in_array($mediaGuardStatus, [401, 403], true), "Unauthenticated GET /wp/v2/media/{$dielineAttId} blocked with HTTP {$mediaGuardStatus}");
+    wp_set_current_user($admins[0]->ID);
+
+    // Verify rollback protection blocks accidental rollback
+    $rollbackBlocked = false;
+    try {
+        (new CatalogMigrationRunner($wpdb, [new CreateCatalogTables()]))->rollbackLast('WRONG_TOKEN');
+    } catch (RuntimeException) {
+        $rollbackBlocked = true;
+    }
+    $assert($rollbackBlocked, 'CatalogMigrationRunner::rollbackLast() blocks unauthorized destructive rollback');
+
+    // Verify 2 MiB import payload size limit returns HTTP 413
+    $oversizedReq = new WP_REST_Request('POST', '/djgear/v1/catalog/import/validate');
+    $oversizedReq->set_header('Content-Type', 'application/json');
+    $oversizedReq->set_body('{"devices":[' . str_repeat(' ', 2100000) . ']}');
+    $assert(rest_do_request($oversizedReq)->get_status() === 413, 'Oversized (>2 MiB) import payload rejected with HTTP 413');
 
     /** @var DeviceRepository $devRepo */
     $devRepo = $core->container()->get(DeviceRepository::class);
@@ -359,6 +394,9 @@ try {
     }
     if ($wcProductId > 0) {
         wp_delete_post($wcProductId, true);
+    }
+    if (isset($dielineAttId) && is_int($dielineAttId) && $dielineAttId > 0) {
+        wp_delete_post($dielineAttId, true);
     }
     if ($createdBrandId > 0) {
         try { $taxRepo->deleteBrand($createdBrandId, 0); } catch (\Throwable) {}

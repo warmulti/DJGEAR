@@ -20,6 +20,8 @@ use WP_REST_Server;
  */
 final class ImportExportController implements RouteInterface
 {
+    public const MAX_PAYLOAD_BYTES = 2097152; // 2 MiB hard limit
+
     public function __construct(
         private readonly Authorizer $authorizer,
         private readonly ImportExportService $importExport,
@@ -103,6 +105,15 @@ final class ImportExportController implements RouteInterface
      */
     private function body(WP_REST_Request $request): array
     {
+        $rawBody = $request->get_body();
+        if (strlen($rawBody) > self::MAX_PAYLOAD_BYTES) {
+            throw new ValidationException(
+                'Import payload exceeds the maximum allowed size of 2 MiB.',
+                413,
+                'djgear_catalog_payload_too_large'
+            );
+        }
+
         $json = $request->get_json_params();
 
         return $json !== [] ? $json : $request->get_params();

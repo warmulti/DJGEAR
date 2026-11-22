@@ -12,6 +12,7 @@ use DJGear\DeviceCatalog\Domain\CatalogValidator;
 use DJGear\DeviceCatalog\Domain\ValidationException;
 use DJGear\DeviceCatalog\Security\CatalogCapabilities;
 use DJGear\DeviceCatalog\Security\PublicCatalogSerializer;
+use DJGear\DeviceCatalog\Security\PublicRateLimiter;
 use PHPUnit\Framework\TestCase;
 
 final class CatalogDomainTest extends TestCase
@@ -164,5 +165,26 @@ final class CatalogDomainTest extends TestCase
         $registry->register($module);
         $module->register($container);
         self::assertTrue($registry->has('djgear-device-catalog'));
+    }
+
+    public function testRateLimiterIgnoresSpoofedForwardedHeadersUnlessProxyIsTrusted(): void
+    {
+        $untrusted = new PublicRateLimiter(120, 60, []);
+        self::assertSame(
+            '198.51.100.7',
+            $untrusted->resolveClientIp([
+                'REMOTE_ADDR'          => '198.51.100.7',
+                'HTTP_X_FORWARDED_FOR' => '1.2.3.4, 5.6.7.8',
+            ])
+        );
+
+        $trusted = new PublicRateLimiter(120, 60, ['172.18.0.10']);
+        self::assertSame(
+            '203.0.113.42',
+            $trusted->resolveClientIp([
+                'REMOTE_ADDR'          => '172.18.0.10',
+                'HTTP_X_FORWARDED_FOR' => '9.9.9.9, 203.0.113.42',
+            ])
+        );
     }
 }

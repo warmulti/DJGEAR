@@ -7,6 +7,7 @@ namespace DJGear\DeviceCatalog\Repositories;
 use DJGear\DeviceCatalog\Domain\CatalogValidator;
 use DJGear\DeviceCatalog\Domain\ValidationException;
 use DJGear\DeviceCatalog\Lifecycle\Migrations\CreateCatalogTables;
+use DJGear\DeviceCatalog\Security\DielineProtection;
 use wpdb;
 
 /**
@@ -145,6 +146,7 @@ final class SkinDefinitionRepository
         }
 
         $skinId = (int) $this->wpdb->insert_id;
+        DielineProtection::markPrivateDieline($clean['dieline_attachment_id']);
         $this->syncCompatibleDevices($skinId, $clean['compatible_device_ids']);
         $this->refreshSkinReadyFlags($clean['compatible_device_ids']);
 
@@ -206,6 +208,7 @@ final class SkinDefinitionRepository
             ['id' => $skinId]
         );
 
+        DielineProtection::markPrivateDieline($clean['dieline_attachment_id']);
         $this->syncCompatibleDevices($skinId, $clean['compatible_device_ids']);
         $affectedDevices = array_values(array_unique(array_merge($previousDevices, $clean['compatible_device_ids'])));
         $this->refreshSkinReadyFlags($affectedDevices);
@@ -333,7 +336,9 @@ final class SkinDefinitionRepository
             'preview_attachment_id' => $previewId,
             'preview_image_url'     => $previewId !== null ? (wp_get_attachment_image_url($previewId, 'large') ?: null) : null,
             'dieline_attachment_id' => $dielineId,
-            'dieline_url'           => $dielineId !== null ? (wp_get_attachment_url($dielineId) ?: null) : null,
+            'dieline_url'           => $dielineId !== null && function_exists('rest_url')
+                ? esc_url_raw(rest_url('djgear/v1/catalog/skins/' . $skinId . '/dieline'))
+                : null,
             'base_wc_product_id'    => $row['base_wc_product_id'] !== null ? (int) $row['base_wc_product_id'] : null,
             'internal_notes'        => (string) ($row['internal_notes'] ?? ''),
             'notes_fa'              => (string) ($row['notes_fa'] ?? ''),

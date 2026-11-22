@@ -48,11 +48,23 @@ final class CatalogMigrationRunner
         return $newlyApplied;
     }
 
+    public const ROLLBACK_CONFIRMATION_TOKEN = 'CONFIRM_DESTRUCTIVE_CATALOG_ROLLBACK';
+
     /**
-     * Roll back the most recently applied migration (for controlled rollback/testing).
+     * Roll back the most recently applied migration ONLY when explicitly authorized via
+     * both `DJGEAR_ALLOW_DESTRUCTIVE_ROLLBACK === true` and the confirmation token.
      */
-    public function rollbackLast(): ?string
+    public function rollbackLast(string $confirmationToken = ''): ?string
     {
+        $allowedByEnv = defined('DJGEAR_ALLOW_DESTRUCTIVE_ROLLBACK')
+            && constant('DJGEAR_ALLOW_DESTRUCTIVE_ROLLBACK') === true;
+
+        if (!$allowedByEnv || !hash_equals(self::ROLLBACK_CONFIRMATION_TOKEN, $confirmationToken)) {
+            throw new \RuntimeException(
+                'Destructive catalog migration rollback is blocked unless DJGEAR_ALLOW_DESTRUCTIVE_ROLLBACK is true and the explicit confirmation token is provided.'
+            );
+        }
+
         $applied = $this->appliedVersions();
         if ($applied === []) {
             return null;

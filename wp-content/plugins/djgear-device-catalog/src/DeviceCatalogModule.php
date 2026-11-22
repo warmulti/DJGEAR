@@ -19,6 +19,7 @@ use DJGear\DeviceCatalog\Rest\DevicesController;
 use DJGear\DeviceCatalog\Rest\ImportExportController;
 use DJGear\DeviceCatalog\Rest\PublicCatalogController;
 use DJGear\DeviceCatalog\Rest\SkinDefinitionsController;
+use DJGear\DeviceCatalog\Security\DielineProtection;
 use DJGear\DeviceCatalog\Security\PublicRateLimiter;
 use DJGear\DeviceCatalog\Services\ImportExportService;
 use DJGear\DeviceCatalog\Services\WooCommerceProductHydrator;
@@ -57,6 +58,7 @@ final class DeviceCatalogModule extends AbstractModule
     {
         $container->instance('catalog.plugin_file', $this->pluginFile);
         $container->singleton(CatalogCacheService::class, static fn (): CatalogCacheService => new CatalogCacheService());
+        $container->singleton(DielineProtection::class, static fn (): DielineProtection => new DielineProtection());
         $container->singleton(PublicRateLimiter::class, static fn (): PublicRateLimiter => new PublicRateLimiter());
         $container->singleton(TaxonomyRepository::class, static fn (): TaxonomyRepository => new TaxonomyRepository());
         $container->singleton(WooCommerceProductHydrator::class, static fn (): WooCommerceProductHydrator => new WooCommerceProductHydrator());
@@ -117,6 +119,10 @@ final class DeviceCatalogModule extends AbstractModule
     public function boot(ContainerInterface $container): void
     {
         add_action('init', [CatalogPostTypes::class, 'register'], 5);
+
+        /** @var DielineProtection $dielineProtection */
+        $dielineProtection = $container->get(DielineProtection::class);
+        $dielineProtection->registerHooks();
 
         // Keep compatibility references clean if a WooCommerce product is permanently deleted
         add_action('before_delete_post', static function (int $postId) use ($container): void {
