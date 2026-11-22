@@ -1,0 +1,36 @@
+{
+  "name": "djgear/djgear-core",
+  "version": "0.1.0",
+  "description": "Core modular foundation plugin for DJGear.ir WordPress & WooCommerce platform.",
+  "type": "wordpress-plugin",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.3"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5",
+    "phpstan/phpstan": "^2.1",
+    "php-stubs/wordpress-stubs": "^6.7",
+    "php-stubs/woocommerce-stubs": "^9.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "DJGear\\Core\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "DJGear\\Core\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true,
+    "allow-plugins": {}
+  },
+  "scripts": {
+    "lint": "find src tests djgear-core.php -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "test:unit": "phpunit --configuration phpunit.xml.dist",
+    "analyse": "phpstan analyse --configuration=phpstan.neon.dist --memory-limit=512M"
+  }
+}
