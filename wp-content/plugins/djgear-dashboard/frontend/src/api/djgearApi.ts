@@ -17,6 +17,9 @@ import type {
   OrderItem,
   OverviewData,
   ProductItem,
+  SkinOrderJob,
+  SkinPlan,
+  SkinVariant,
 } from '../types/api';
 import { WpRestClient } from './httpClient';
 
@@ -166,5 +169,60 @@ export class DjgearApi {
 
   public exportCatalog(format: 'json' | 'csv'): Promise<ApiEnvelope<{ format: string; payload?: unknown; content?: string }>> {
     return this.client.get('djgear/v1/catalog/export', { format });
+  }
+
+  // --- Phase 4: Commercial Custom Skins API (djgear-custom-skins) ---
+  public listSkinVariants(params?: {
+    device_id?: number;
+    status?: string;
+    q?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ApiEnvelope<{ items: SkinVariant[] }>> {
+    return this.client.get<{ items: SkinVariant[] }>('djgear/v1/skins/admin/variants', params);
+  }
+
+  public createSkinVariant(payload: Record<string, unknown>): Promise<ApiEnvelope<SkinVariant>> {
+    return this.client.post<SkinVariant>('djgear/v1/skins/admin/variants', payload);
+  }
+
+  public updateSkinVariant(id: number, payload: Record<string, unknown>): Promise<ApiEnvelope<SkinVariant>> {
+    return this.client.put<SkinVariant>(`djgear/v1/skins/admin/variants/${id}`, payload);
+  }
+
+  public deleteSkinVariant(id: number): Promise<ApiEnvelope<{ deleted: boolean }>> {
+    return this.client.delete<{ deleted: boolean }>(`djgear/v1/skins/admin/variants/${id}`);
+  }
+
+  public listSkinPlans(): Promise<ApiEnvelope<{ items: SkinPlan[] }>> {
+    return this.client.get<{ items: SkinPlan[] }>('djgear/v1/skins/admin/plans');
+  }
+
+  public createSkinPlan(payload: Record<string, unknown>): Promise<ApiEnvelope<SkinPlan>> {
+    return this.client.post<SkinPlan>('djgear/v1/skins/admin/plans', payload);
+  }
+
+  public updateSkinPlan(id: number, payload: Record<string, unknown>): Promise<ApiEnvelope<SkinPlan>> {
+    return this.client.put<SkinPlan>(`djgear/v1/skins/admin/plans/${id}`, payload);
+  }
+
+  public deleteSkinPlan(id: number): Promise<ApiEnvelope<{ deleted: boolean }>> {
+    return this.client.delete<{ deleted: boolean }>(`djgear/v1/skins/admin/plans/${id}`);
+  }
+
+  public listSkinJobs(params?: {
+    status?: string;
+    q?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ApiEnvelope<{ items: SkinOrderJob[]; counts: Record<string, number> }>> {
+    return this.client.get<{ items: SkinOrderJob[]; counts: Record<string, number> }>('djgear/v1/skins/admin/jobs', params);
+  }
+
+  public transitionSkinJob(
+    id: number,
+    payload: { to_status: string; tracking_code?: string; internal_notes?: string; comment?: string }
+  ): Promise<ApiEnvelope<SkinOrderJob>> {
+    return this.client.post<SkinOrderJob>(`djgear/v1/skins/admin/jobs/${id}/transition`, payload);
   }
 }

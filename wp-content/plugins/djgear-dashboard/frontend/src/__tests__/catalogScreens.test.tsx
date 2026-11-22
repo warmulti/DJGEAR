@@ -34,8 +34,11 @@ function makeConfig(role: 'administrator' | 'shop_manager'): DashboardBootConfig
         djgear_manage_integrations: isAdmin,
         djgear_view_catalog: true,
         djgear_manage_catalog: true,
-        djgear_manage_skin_definitions: isAdmin,
         djgear_import_export_catalog: isAdmin,
+        djgear_view_skin_orders: true,
+        djgear_manage_skin_orders: true,
+        djgear_manage_skin_catalog: true,
+        djgear_manage_skin_plans: isAdmin,
       },
     },
   };
@@ -74,7 +77,6 @@ function makeMockApi(): DjgearApi {
     }),
     listCatalogBrands: vi.fn().mockResolvedValue({ success: true, data: { items: [] } }),
     listCatalogCategories: vi.fn().mockResolvedValue({ success: true, data: { items: [] } }),
-    listCatalogSkins: vi.fn().mockResolvedValue({ success: true, data: { items: [] } }),
     switchUserLocale: vi.fn().mockResolvedValue({
       success: true,
       data: { i18n: { locale: 'fa_IR', direction: 'rtl', is_rtl: true, text_domain: 'djgear-core', supported_locales: ['fa_IR', 'en_US'] } },
@@ -82,8 +84,8 @@ function makeMockApi(): DjgearApi {
   } as unknown as DjgearApi;
 }
 
-describe('Phase 3 Device Catalog Dashboard Screens', () => {
-  it('allows shop_manager to view devices but blocks Skin Definitions and Import/Export', async () => {
+describe('Phase 3 Device Catalog Dashboard Screens (Preserved with Phase 4 Sidebar Alignment)', () => {
+  it('preserves Device Models, Brands & Categories, and admin-only Import/Export while hiding legacy Skin Definitions', async () => {
     const user = userEvent.setup();
     render(<App config={makeConfig('shop_manager')} api={makeMockApi()} initialRoute="catalog-devices" />);
 
@@ -92,26 +94,30 @@ describe('Phase 3 Device Catalog Dashboard Screens', () => {
     });
     expect(screen.getByText('Skin Ready')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Skin Definitions' }));
-    expect(screen.getByText('Permission Denied')).toBeInTheDocument();
-    expect(screen.getByText(/djgear_manage_skin_definitions/)).toBeInTheDocument();
+    // Legacy engineering Skin Definitions item is hidden from sidebar navigation
+    expect(screen.queryByRole('button', { name: 'Skin Definitions' })).not.toBeInTheDocument();
 
+    // Preserved catalog navigation items remain intact
+    expect(screen.getByRole('button', { name: 'Device Models' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Brands & Categories' })).toBeInTheDocument();
+
+    // Import/Export remains administrator-only
     await user.click(screen.getByRole('button', { name: 'Catalog Import / Export' }));
     expect(screen.getByText('Permission Denied')).toBeInTheDocument();
     expect(screen.getByText(/djgear_import_export_catalog/)).toBeInTheDocument();
   });
 
-  it('allows administrator to access Skin Definitions and switches to Persian RTL', async () => {
+  it('allows administrator to access Brands & Categories and switches to Persian RTL', async () => {
     const user = userEvent.setup();
-    render(<App config={makeConfig('administrator')} api={makeMockApi()} initialRoute="catalog-skins" />);
+    render(<App config={makeConfig('administrator')} api={makeMockApi()} initialRoute="catalog-taxonomies" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Compatible Skin Engineering Definitions')).toBeInTheDocument();
+      expect(screen.getByText('Manufacturers & Device Categories')).toBeInTheDocument();
     });
 
     await user.click(screen.getByTestId('language-switcher'));
     await waitFor(() => {
-      expect(screen.getByText('تعاریف مهندسی اسکین‌های سازگار')).toBeInTheDocument();
+      expect(screen.getByText('تولیدکنندگان و دسته‌بندی دستگاه‌ها')).toBeInTheDocument();
     });
     expect(screen.getByTestId('djgear-shell')).toHaveAttribute('dir', 'rtl');
   });

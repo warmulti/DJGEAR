@@ -1,0 +1,79 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: DJGear Custom Skins 0.1.0\n"
+"Language: fa_IR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Custom Skin Orders"
+msgstr "سفارش‌های اسکین سفارشی"
+
+msgid "Your Custom Skin Orders"
+msgstr "سفارش‌های اسکین سفارشی شما"
+
+msgid "Please sign in to view your custom skin orders."
+msgstr "لطفاً برای مشاهده سفارش‌های اسکین سفارشی وارد حساب کاربری خود شوید."
+
+msgid "You have not configured any custom DJ skins yet."
+msgstr "شما هنوز هیچ اسکین سفارشی دی‌جی ثبت نکرده‌اید."
+
+msgid "DJ Device"
+msgstr "دستگاه دی‌جی"
+
+msgid "Skin Model"
+msgstr "مدل اسکین"
+
+msgid "Skin Model & Color"
+msgstr "مدل و رنگ اسکین"
+
+msgid "Color"
+msgstr "رنگ"
+
+msgid "Color & Finish"
+msgstr "رنگ و روکش"
+
+msgid "Ordering Plan"
+msgstr "پلن سفارش"
+
+msgid "Production Status"
+msgstr "وضعیت تولید"
+
+msgid "Order / Tracking"
+msgstr "سفارش / رهگیری"
+
+msgid "Proof Ready for Approval"
+msgstr "پیش‌نمایش آماده تأیید"
+
+msgid "Draft"
+msgstr "پیش‌نویس"
+
+msgid "Tracking:"
+msgstr "کد رهگیری:"
+
+msgid "Configure Your Custom DJ Skin"
+msgstr "طراحی و سفارش اسکین اختصاصی دی‌جی"
+
+msgid "1. Select your DJ device · 2. Choose skin model & color · 3. Pick Standard or Custom Design plan · 4. Complete checkout via WooCommerce."
+msgstr "۱. انتخاب دستگاه دی‌جی · ۲. انتخاب مدل و رنگ اسکین · ۳. انتخاب پلن استاندارد یا طراحی اختصاصی · ۴. تکمیل خرید از طریق ووکامرس."
+
+msgid "Authentication is required to access custom skin orders and artwork uploads."
+msgstr "برای دسترسی به سفارش‌های اسکین و بارگذاری طرح اختصاصی، ورود به حساب کاربری الزامی است."
+
+msgid "Each custom DJ skin configuration is produced individually (quantity must remain 1). Configure an additional skin to order more."
+msgstr "هر سفارش اسکین سفارشی به‌صورت مجزا تولید می‌شود (تعداد باید ۱ باقی بماند). برای سفارش بیشتر، یک اسکین جدید پیکربندی کنید."
+
+msgid "Duplicate custom skin job detected in your cart. Please remove duplicates before checkout."
+msgstr "سفارش اسکین تکراری در سبد خرید شما تشخیص داده شد. لطفاً پیش از تسویه حساب مورد تکراری را حذف کنید."
+
+msgid "Each custom skin item in your cart must have quantity 1."
+msgstr "تعداد هر قلم اسکین سفارشی در سبد خرید باید دقیقاً ۱ باشد."
+
+msgid "Please sign in before checking out with a custom DJ skin."
+msgstr "لطفاً پیش از تسویه حساب اسکین سفارشی، وارد حساب کاربری خود شوید."
+
+msgid "Your DJGear Custom Skin (%1$s, ref %2$s) has shipped. Tracking code: %3$s"
+msgstr "اسکین اختصاصی دی‌جی‌گیر شما (%1$s، شناسه %2$s) ارسال شد. کد رهگیری: %3$s"
+
+msgid "Your DJGear Custom Skin (%1$s, ref %2$s) has shipped."
+msgstr "اسکین اختصاصی دی‌جی‌گیر شما (%1$s، شناسه %2$s) ارسال شد."

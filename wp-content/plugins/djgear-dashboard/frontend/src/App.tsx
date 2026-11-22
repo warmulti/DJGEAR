@@ -7,7 +7,6 @@ import { I18nProvider } from './i18n/I18nContext';
 import { getRouteById, hasRoutePermission, type RouteId } from './navigation/routes';
 import { CatalogDevicesPage } from './pages/CatalogDevicesPage';
 import { CatalogImportExportPage } from './pages/CatalogImportExportPage';
-import { CatalogSkinsPage } from './pages/CatalogSkinsPage';
 import { CatalogTaxonomiesPage } from './pages/CatalogTaxonomiesPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { ModuleHubPage } from './pages/ModuleHubPage';
@@ -16,6 +15,9 @@ import { OrdersPage } from './pages/OrdersPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SkinOrdersPage } from './pages/SkinOrdersPage';
+import { SkinPlansPage } from './pages/SkinPlansPage';
+import { SkinVariantsPage } from './pages/SkinVariantsPage';
 import type { DashboardBootConfig } from './types/api';
 
 export interface AppProps {
@@ -63,10 +65,19 @@ export function App({ config, api: injectedApi, initialRoute = 'overview' }: App
         );
       case 'catalog-taxonomies':
         return <CatalogTaxonomiesPage api={api} />;
-      case 'catalog-skins':
-        return <CatalogSkinsPage api={api} />;
       case 'catalog-import-export':
         return <CatalogImportExportPage api={api} />;
+      case 'skins-variants':
+        return <SkinVariantsPage api={api} />;
+      case 'skins-plans':
+        return <SkinPlansPage api={api} />;
+      case 'skins-orders':
+        return (
+          <SkinOrdersPage
+            api={api}
+            canManage={Boolean(config.currentUser.capabilities.djgear_manage_skin_orders)}
+          />
+        );
       case 'modules':
         return <ModulesPage api={api} />;
       case 'settings':

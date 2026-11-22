@@ -263,6 +263,116 @@ export interface CatalogImportValidation {
   rows: Array<{ index: number; canonical_key?: string; model_code?: string; action: string; error?: string }>;
 }
 
+// --- Phase 4: Commercial Custom Skins (djgear-custom-skins) ---
+export interface SkinVariant {
+  id: number;
+  device_id: number;
+  wc_product_id: number;
+  wc_variation_id: number | null;
+  wc_product_name: string | null;
+  model_code: string;
+  model_name_fa: string;
+  model_name_en: string;
+  color_code: string;
+  color_name_fa: string;
+  color_name_en: string;
+  color_hex: string;
+  finish: 'matte' | 'gloss' | 'satin' | 'carbon' | 'brushed_metal';
+  preview_attachment_id: number | null;
+  preview_image_url: string | null;
+  print_width_mm: number | null;
+  print_height_mm: number | null;
+  status: 'active' | 'inactive';
+  sort_order: number;
+  base_price: number | null;
+  currency: string;
+  in_stock: boolean;
+  updated_at: string;
+}
+
+export interface SkinPlan {
+  id: number;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  description_fa: string;
+  description_en: string;
+  plan_type: 'standard' | 'custom_design';
+  allows_artwork_upload: boolean;
+  requires_artwork: boolean;
+  requires_proof_approval: boolean;
+  max_revisions: number;
+  price_surcharge: number;
+  estimated_lead_days: number;
+  features_fa: string[];
+  features_en: string[];
+  is_active: boolean;
+  sort_order: number;
+  updated_at: string;
+}
+
+export interface SkinArtworkRevision {
+  id: number;
+  revision_type: 'customer_artwork' | 'designer_proof';
+  version_number: number;
+  original_filename: string;
+  mime_type: string;
+  file_size_bytes: number;
+  sha256_hash: string;
+  pixel_width: number | null;
+  pixel_height: number | null;
+  computed_dpi: number | null;
+  dpi_status: 'pass' | 'warning' | 'rejected' | 'not_applicable';
+  low_dpi_acknowledged: boolean;
+  customer_decision: string;
+  decision_at: string | null;
+  note_fa: string | null;
+  note_en: string | null;
+  created_at: string;
+  download_url: string;
+}
+
+export interface SkinJobHistoryItem {
+  id: number;
+  from_status: string | null;
+  to_status: string;
+  actor_role: string;
+  is_customer_visible: boolean;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface SkinOrderJob {
+  id: number;
+  job_uuid: string;
+  customer_user_id: number;
+  customer_name: string | null;
+  wc_order_id: number | null;
+  wc_order_status: string | null;
+  wc_order_admin_url: string | null;
+  device_id: number;
+  skin_variant_id: number;
+  plan_id: number;
+  snapshot: {
+    device?: { name_fa?: string; name_en?: string; model_code?: string; brand_en?: string; brand_fa?: string };
+    variant?: { model_name_fa?: string; model_name_en?: string; color_name_fa?: string; color_name_en?: string; color_hex?: string; finish?: string };
+    plan?: { slug?: string; name_fa?: string; name_en?: string; plan_type?: string; allows_artwork_upload?: boolean; requires_proof_approval?: boolean };
+  };
+  status: string;
+  allowed_next: string[];
+  current_artwork_id: number | null;
+  current_proof_id: number | null;
+  approved_proof_id: number | null;
+  approved_at: string | null;
+  customer_notes: string | null;
+  internal_notes: string | null;
+  tracking_code: string | null;
+  artworks?: SkinArtworkRevision[];
+  status_history?: SkinJobHistoryItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 declare global {
   interface Window {
     DJGEAR_DASHBOARD_CONFIG?: DashboardBootConfig;

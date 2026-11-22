@@ -113,6 +113,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 Invoke-WpCli @('plugin', 'activate', 'djgear-device-catalog')
 
+Write-Host "==> Installing DJGear Custom Skins Composer autoloader and activating djgear-custom-skins..." -ForegroundColor Cyan
+& docker compose exec -T -w /var/www/html/wp-content/plugins/djgear-custom-skins wordpress composer install --no-interaction --prefer-dist
+if ($LASTEXITCODE -ne 0) {
+    throw "Composer install failed for djgear-custom-skins."
+}
+Invoke-WpCli @('plugin', 'activate', 'djgear-custom-skins')
+
 Write-Host "==> Verifying active plugins & Redis status..." -ForegroundColor Cyan
 Invoke-WpCli @('plugin', 'list')
 Invoke-WpCli @('redis', 'status')
