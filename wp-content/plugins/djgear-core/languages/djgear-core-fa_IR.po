@@ -1,0 +1,22 @@
+# Persian (fa_IR) translation for DJGear Core
+msgid ""
+msgstr ""
+"Project-Id-Version: DJGear Core 0.1.0\n"
+"Language: fa_IR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Domain: djgear-core\n"
+
+msgid "DJGear Core"
+msgstr "هسته دی‌جی‌گیر"
+
+msgid "DJGear Platform Healthy"
+msgstr "پلتفرم دی‌جی‌گیر آماده به کار است"
+
+msgid "Authentication is required to access this DJGear endpoint."
+msgstr "برای دسترسی به این نقطه پایانی دی‌جی‌گیر احراز هویت الزامی است."
+
+msgid "DJGear Core requires Composer dependencies. Run `composer install` in wp-content/plugins/djgear-core."
+msgstr "هسته دی‌جی‌گیر به وابستگی‌های Composer نیاز دارد. دستور `composer install` را در wp-content/plugins/djgear-core اجرا کنید."

@@ -122,6 +122,7 @@ services:
       - wp_core:/var/www/html
       - wp_uploads:/var/www/html/wp-content/uploads
       - ./wp-content/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+      - ./wp-content/plugins/djgear-core:/var/www/html/wp-content/plugins/djgear-core
     networks:
       - djgear_frontend
       - djgear_backend
@@ -144,6 +145,7 @@ services:
     volumes:
       - wp_core:/var/www/html:ro
       - wp_uploads:/var/www/html/wp-content/uploads:ro
+      - ./wp-content/plugins/djgear-core:/var/www/html/wp-content/plugins/djgear-core:ro
       - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:

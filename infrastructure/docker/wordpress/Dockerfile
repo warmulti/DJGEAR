@@ -17,6 +17,9 @@ RUN set -eux; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false libxml2-dev; \
     rm -rf /var/lib/apt/lists/* /tmp/pear
 
+# Install Composer 2 binary for PSR-4 autoloading and PHP testing/analysis
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
 # Install WP-CLI for reproducible WordPress & WooCommerce management
 ENV WP_CLI_CACHE_DIR=/tmp/wp-cli-cache
 RUN set -eux; \
