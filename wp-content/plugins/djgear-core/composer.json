@@ -1,6 +1,5 @@
 {
   "name": "djgear/djgear-core",
-  "version": "0.1.0",
   "description": "Core modular foundation plugin for DJGear.ir WordPress & WooCommerce platform.",
   "type": "wordpress-plugin",
   "license": "proprietary",

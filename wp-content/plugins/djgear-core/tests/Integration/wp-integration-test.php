@@ -123,7 +123,28 @@ try {
     wp_set_current_user(0);
 }
 
-// 6c. Authenticated administrator -> 200
+// 6c. Authenticated shop_manager -> 200 on health & audit-logs, 403 on sensitive modules/core ops
+$smLogin = 'djgear_qa_sm_' . wp_generate_password(6, false);
+$smUserId = wp_create_user($smLogin, wp_generate_password(16, true), $smLogin . '@djgear.local');
+$assert(!is_wp_error($smUserId) && is_int($smUserId), 'Created temporary shop_manager user for least-privilege check');
+try {
+    $smUser = new WP_User($smUserId);
+    $smUser->set_role('shop_manager');
+    wp_set_current_user($smUserId);
+
+    $assert(rest_do_request(new WP_REST_Request('GET', '/djgear/v1/health'))->get_status() === 200, 'Shop Manager GET /djgear/v1/health returns 200');
+    $assert(rest_do_request(new WP_REST_Request('GET', '/djgear/v1/audit-logs'))->get_status() === 200, 'Shop Manager GET /djgear/v1/audit-logs returns 200');
+    $assert(rest_do_request(new WP_REST_Request('GET', '/djgear/v1/modules'))->get_status() === 403, 'Shop Manager GET /djgear/v1/modules returns 403');
+    $assert(!current_user_can(Capabilities::MANAGE_CORE), 'Shop Manager cannot djgear_manage_core');
+    $assert(!current_user_can(Capabilities::MANAGE_MODULES), 'Shop Manager cannot djgear_manage_modules');
+    $assert(!current_user_can(Capabilities::MANAGE_INTEGRATIONS), 'Shop Manager cannot djgear_manage_integrations');
+} finally {
+    require_once ABSPATH . 'wp-admin/includes/user.php';
+    wp_delete_user($smUserId);
+    wp_set_current_user(0);
+}
+
+// 6d. Authenticated administrator -> 200
 $admins = get_users(['role' => 'administrator', 'number' => 1]);
 $assert(count($admins) === 1, 'Found local administrator user');
 wp_set_current_user($admins[0]->ID);
