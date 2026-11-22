@@ -1,0 +1,19 @@
+# Enforce consistent line endings across Windows 11 host and Linux Docker containers
+* text=auto eol=lf
+
+# Windows PowerShell & Batch scripts may use CRLF locally
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary
