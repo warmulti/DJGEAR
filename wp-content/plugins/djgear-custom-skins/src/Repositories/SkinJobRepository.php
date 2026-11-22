@@ -12,11 +12,18 @@ use wpdb;
 /**
  * Repository for Custom Skin jobs (`djgear_skin_jobs`), immutable artwork/proof revisions
  * (`djgear_skin_artworks`), and immutable status history (`djgear_skin_status_history`).
+ *
+ * Concurrency & Atomicity Guarantees:
+ * - State transitions, proof decisions, and order bindings execute inside InnoDB transactions
+ *   with `SELECT ... FOR UPDATE` row locks and conditional `WHERE` predicates (`rows_affected === 1`)
+ *   so status and history can never diverge under concurrent requests or duplicate webhooks.
  */
 final class SkinJobRepository
 {
     public const REVISION_CUSTOMER_ARTWORK = 'customer_artwork';
     public const REVISION_DESIGNER_PROOF   = 'designer_proof';
+
+    private int $transactionDepth = 0;
 
     public function __construct(
         private readonly wpdb $wpdb,
@@ -39,7 +46,60 @@ final class SkinJobRepository
     }
 
     /**
-     * Create a draft skin job with frozen commercial snapshot.
+     * Execute a callback inside an InnoDB transaction (reentrant when already inside a transaction).
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    public function transaction(callable $callback): mixed
+    {
+        $isOuter = ($this->transactionDepth === 0);
+        if ($isOuter) {
+            $this->wpdb->query('START TRANSACTION');
+        }
+        $this->transactionDepth++;
+
+        try {
+            $result = $callback();
+            $this->transactionDepth--;
+            if ($isOuter) {
+                $this->wpdb->query('COMMIT');
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            $this->transactionDepth = max(0, $this->transactionDepth - 1);
+            if ($isOuter) {
+                $this->wpdb->query('ROLLBACK');
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Lock and load a job row inside an active transaction (`SELECT ... FOR UPDATE`).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByIdForUpdate(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        $table = $this->jobsTable();
+        $row = $this->wpdb->get_row(
+            $this->wpdb->prepare("SELECT * FROM `{$table}` WHERE id = %d FOR UPDATE", $id),
+            'ARRAY_A'
+        );
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return $this->hydrateJob($row, false);
+    }
+
+    /**
+     * Create a draft skin job with frozen commercial snapshot atomically.
      *
      * @param array<string, mixed> $snapshot
      * @return array<string, mixed>
@@ -53,34 +113,46 @@ final class SkinJobRepository
         array $snapshot,
         string $customerNotes = '',
     ): array {
-        $now = gmdate('Y-m-d H:i:s');
-        $inserted = $this->wpdb->insert($this->jobsTable(), [
-            'job_uuid'         => $jobUuid,
-            'customer_user_id' => $customerUserId,
-            'device_id'        => $deviceId,
-            'skin_variant_id'  => $skinVariantId,
-            'plan_id'          => $planId,
-            'snapshot_json'    => wp_json_encode($snapshot, JSON_UNESCAPED_UNICODE) ?: '{}',
-            'status'           => SkinJobStateMachine::STATUS_DRAFT,
-            'customer_notes'   => $customerNotes !== '' ? $customerNotes : null,
-            'created_at'       => $now,
-            'updated_at'       => $now,
-        ]);
-
-        if ($inserted === false) {
-            throw new SkinValidationException('Failed to create custom skin job: ' . $this->wpdb->last_error, 500);
-        }
-
-        $jobId = (int) $this->wpdb->insert_id;
-        $this->appendHistory(
-            $jobId,
-            null,
-            SkinJobStateMachine::STATUS_DRAFT,
+        $jobId = $this->transaction(function () use (
+            $jobUuid,
             $customerUserId,
-            'customer',
-            true,
-            'Skin configuration draft created.'
-        );
+            $deviceId,
+            $skinVariantId,
+            $planId,
+            $snapshot,
+            $customerNotes
+        ): int {
+            $now = gmdate('Y-m-d H:i:s');
+            $inserted = $this->wpdb->insert($this->jobsTable(), [
+                'job_uuid'         => $jobUuid,
+                'customer_user_id' => $customerUserId,
+                'device_id'        => $deviceId,
+                'skin_variant_id'  => $skinVariantId,
+                'plan_id'          => $planId,
+                'snapshot_json'    => wp_json_encode($snapshot, JSON_UNESCAPED_UNICODE) ?: '{}',
+                'status'           => SkinJobStateMachine::STATUS_DRAFT,
+                'customer_notes'   => $customerNotes !== '' ? $customerNotes : null,
+                'created_at'       => $now,
+                'updated_at'       => $now,
+            ]);
+
+            if ($inserted === false) {
+                throw new SkinValidationException('Failed to create custom skin job: ' . $this->wpdb->last_error, 500);
+            }
+
+            $id = (int) $this->wpdb->insert_id;
+            $this->appendHistory(
+                $id,
+                null,
+                SkinJobStateMachine::STATUS_DRAFT,
+                $customerUserId,
+                'customer',
+                true,
+                'Skin configuration draft created.'
+            );
+
+            return $id;
+        });
 
         $job = $this->findById($jobId, true);
         if ($job === null) {
@@ -251,67 +323,85 @@ final class SkinJobRepository
     }
 
     /**
-     * Add an immutable customer artwork or designer proof revision to a job.
+     * Add an immutable customer artwork or designer proof revision to a job atomically.
+     * When a new customer artwork revision is added, all previous DPI acknowledgments on the job are invalidated.
      *
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
     public function addArtworkRevision(int $jobId, string $revisionType, array $data): array
     {
-        $table = $this->artworksTable();
-        $maxVer = (int) $this->wpdb->get_var(
-            $this->wpdb->prepare(
-                "SELECT COALESCE(MAX(version_number), 0) FROM `{$table}` WHERE job_id = %d AND revision_type = %s",
-                $jobId,
-                $revisionType
-            )
-        );
-        $nextVersion = $maxVer + 1;
-        $now = gmdate('Y-m-d H:i:s');
+        $revId = $this->transaction(function () use ($jobId, $revisionType, $data): int {
+            $this->findByIdForUpdate($jobId);
 
-        $inserted = $this->wpdb->insert($table, [
-            'job_id'                => $jobId,
-            'revision_type'         => $revisionType,
-            'version_number'        => $nextVersion,
-            'uploaded_by_user_id'   => (int) ($data['uploaded_by_user_id'] ?? 0),
-            'storage_rel_path'      => (string) ($data['storage_rel_path'] ?? ''),
-            'original_filename'     => (string) ($data['original_filename'] ?? 'artwork'),
-            'mime_type'             => (string) ($data['mime_type'] ?? 'application/octet-stream'),
-            'file_size_bytes'       => (int) ($data['file_size_bytes'] ?? 0),
-            'sha256_hash'           => (string) ($data['sha256_hash'] ?? ''),
-            'pixel_width'           => $data['pixel_width'] ?? null,
-            'pixel_height'          => $data['pixel_height'] ?? null,
-            'computed_dpi'          => $data['computed_dpi'] ?? null,
-            'dpi_status'            => (string) ($data['dpi_status'] ?? 'not_applicable'),
-            'preflight_report_json' => isset($data['preflight_report'])
-                ? (wp_json_encode($data['preflight_report'], JSON_UNESCAPED_UNICODE) ?: null)
-                : null,
-            'low_dpi_acknowledged'  => !empty($data['low_dpi_acknowledged']) ? 1 : 0,
-            'customer_decision'     => (string) ($data['customer_decision'] ?? ($revisionType === self::REVISION_DESIGNER_PROOF ? 'pending' : 'not_applicable')),
-            'note_fa'               => isset($data['note_fa']) && is_string($data['note_fa']) ? $data['note_fa'] : null,
-            'note_en'               => isset($data['note_en']) && is_string($data['note_en']) ? $data['note_en'] : null,
-            'created_at'            => $now,
-        ]);
-
-        if ($inserted === false) {
-            throw new SkinValidationException('Failed to record artwork revision: ' . $this->wpdb->last_error, 500);
-        }
-
-        $revId = (int) $this->wpdb->insert_id;
-
-        if ($revisionType === self::REVISION_CUSTOMER_ARTWORK) {
-            $this->wpdb->update(
-                $this->jobsTable(),
-                ['current_artwork_id' => $revId, 'updated_at' => $now],
-                ['id' => $jobId]
+            $table = $this->artworksTable();
+            $maxVer = (int) $this->wpdb->get_var(
+                $this->wpdb->prepare(
+                    "SELECT COALESCE(MAX(version_number), 0) FROM `{$table}` WHERE job_id = %d AND revision_type = %s",
+                    $jobId,
+                    $revisionType
+                )
             );
-        } elseif ($revisionType === self::REVISION_DESIGNER_PROOF) {
-            $this->wpdb->update(
-                $this->jobsTable(),
-                ['current_proof_id' => $revId, 'updated_at' => $now],
-                ['id' => $jobId]
-            );
-        }
+            $nextVersion = $maxVer + 1;
+            $now = gmdate('Y-m-d H:i:s');
+
+            if ($revisionType === self::REVISION_CUSTOMER_ARTWORK) {
+                // Invalidate all previous low-DPI acknowledgments when artwork is replaced
+                $this->wpdb->query(
+                    $this->wpdb->prepare(
+                        "UPDATE `{$table}` SET low_dpi_acknowledged = 0 WHERE job_id = %d AND revision_type = %s",
+                        $jobId,
+                        self::REVISION_CUSTOMER_ARTWORK
+                    )
+                );
+            }
+
+            $inserted = $this->wpdb->insert($table, [
+                'job_id'                => $jobId,
+                'revision_type'         => $revisionType,
+                'version_number'        => $nextVersion,
+                'uploaded_by_user_id'   => (int) ($data['uploaded_by_user_id'] ?? 0),
+                'storage_rel_path'      => (string) ($data['storage_rel_path'] ?? ''),
+                'original_filename'     => (string) ($data['original_filename'] ?? 'artwork'),
+                'mime_type'             => (string) ($data['mime_type'] ?? 'application/octet-stream'),
+                'file_size_bytes'       => (int) ($data['file_size_bytes'] ?? 0),
+                'sha256_hash'           => (string) ($data['sha256_hash'] ?? ''),
+                'pixel_width'           => $data['pixel_width'] ?? null,
+                'pixel_height'          => $data['pixel_height'] ?? null,
+                'computed_dpi'          => $data['computed_dpi'] ?? null,
+                'dpi_status'            => (string) ($data['dpi_status'] ?? 'not_applicable'),
+                'preflight_report_json' => isset($data['preflight_report'])
+                    ? (wp_json_encode($data['preflight_report'], JSON_UNESCAPED_UNICODE) ?: null)
+                    : null,
+                'low_dpi_acknowledged'  => 0,
+                'customer_decision'     => (string) ($data['customer_decision'] ?? ($revisionType === self::REVISION_DESIGNER_PROOF ? 'pending' : 'not_applicable')),
+                'note_fa'               => isset($data['note_fa']) && is_string($data['note_fa']) ? $data['note_fa'] : null,
+                'note_en'               => isset($data['note_en']) && is_string($data['note_en']) ? $data['note_en'] : null,
+                'created_at'            => $now,
+            ]);
+
+            if ($inserted === false) {
+                throw new SkinValidationException('Failed to record artwork revision: ' . $this->wpdb->last_error, 500);
+            }
+
+            $newId = (int) $this->wpdb->insert_id;
+
+            if ($revisionType === self::REVISION_CUSTOMER_ARTWORK) {
+                $this->wpdb->update(
+                    $this->jobsTable(),
+                    ['current_artwork_id' => $newId, 'updated_at' => $now],
+                    ['id' => $jobId]
+                );
+            } elseif ($revisionType === self::REVISION_DESIGNER_PROOF) {
+                $this->wpdb->update(
+                    $this->jobsTable(),
+                    ['current_proof_id' => $newId, 'updated_at' => $now],
+                    ['id' => $jobId]
+                );
+            }
+
+            return $newId;
+        });
 
         $rev = $this->findArtworkById($revId);
         if ($rev === null) {
@@ -371,61 +461,168 @@ final class SkinJobRepository
         );
     }
 
-    public function acknowledgeLowDpi(int $artworkId): void
+    /**
+     * Bind explicit DPI / manual-review acknowledgment strictly to the exact artwork revision ID and SHA-256 digest.
+     */
+    public function acknowledgeLowDpi(int $artworkId, string $sha256Hash): void
     {
-        $this->wpdb->update(
-            $this->artworksTable(),
-            ['low_dpi_acknowledged' => 1],
-            ['id' => $artworkId],
-            ['%d'],
-            ['%d']
+        $artwork = $this->findArtworkById($artworkId);
+        if ($artwork === null || !hash_equals((string) $artwork['sha256_hash'], $sha256Hash)) {
+            throw SkinValidationException::conflict('artwork_id', 'Artwork digest mismatch during acknowledgment.');
+        }
+
+        $report = is_array($artwork['preflight_report'] ?? null) ? $artwork['preflight_report'] : [];
+        $report['acknowledged_artwork_id'] = $artworkId;
+        $report['acknowledged_sha256'] = $sha256Hash;
+        $report['acknowledged_at'] = gmdate('Y-m-d H:i:s');
+
+        $table = $this->artworksTable();
+        $updated = $this->wpdb->query(
+            $this->wpdb->prepare(
+                "UPDATE `{$table}` SET low_dpi_acknowledged = 1, preflight_report_json = %s WHERE id = %d AND sha256_hash = %s",
+                wp_json_encode($report, JSON_UNESCAPED_UNICODE) ?: '{}',
+                $artworkId,
+                $sha256Hash
+            )
         );
+
+        if ($updated === false) {
+            throw new SkinValidationException('Failed to persist DPI acknowledgment.', 500);
+        }
     }
 
+    /**
+     * Atomically record an immutable customer proof decision (`approved` or `changes_requested`).
+     * Prevents modifying an already-decided proof or overwriting `approved_proof_id`.
+     */
     public function recordProofDecision(int $jobId, int $proofId, string $decision): string
     {
         $now = gmdate('Y-m-d H:i:s');
-        $this->wpdb->update(
-            $this->artworksTable(),
-            [
-                'customer_decision' => $decision,
-                'decision_at'       => $now,
-            ],
-            ['id' => $proofId],
-            ['%s', '%s'],
-            ['%d']
+        $artTable = $this->artworksTable();
+        $jobsTable = $this->jobsTable();
+
+        $affectedArt = $this->wpdb->query(
+            $this->wpdb->prepare(
+                "UPDATE `{$artTable}` SET customer_decision = %s, decision_at = %s WHERE id = %d AND job_id = %d AND revision_type = %s AND customer_decision = 'pending'",
+                $decision,
+                $now,
+                $proofId,
+                $jobId,
+                self::REVISION_DESIGNER_PROOF
+            )
         );
 
-        if ($decision === 'approved') {
-            $this->wpdb->update(
-                $this->jobsTable(),
-                [
-                    'approved_proof_id' => $proofId,
-                    'approved_at'       => $now,
-                    'updated_at'        => $now,
-                ],
-                ['id' => $jobId]
+        if ((int) $affectedArt !== 1) {
+            throw SkinValidationException::conflict(
+                'proof_id',
+                'This designer proof has already been decided and cannot be modified.'
             );
+        }
+
+        if ($decision === 'approved') {
+            $affectedJob = $this->wpdb->query(
+                $this->wpdb->prepare(
+                    "UPDATE `{$jobsTable}` SET approved_proof_id = %d, approved_at = %s, updated_at = %s WHERE id = %d AND approved_proof_id IS NULL",
+                    $proofId,
+                    $now,
+                    $now,
+                    $jobId
+                )
+            );
+            if ((int) $affectedJob !== 1) {
+                throw SkinValidationException::conflict(
+                    'approved_proof_id',
+                    'An approved proof is already permanently locked on this job.'
+                );
+            }
         }
 
         return $now;
     }
 
-    public function bindWooCommerceOrderItem(int $jobId, int $wcOrderId, int $wcOrderItemId): void
-    {
-        $this->wpdb->update(
-            $this->jobsTable(),
-            [
-                'wc_order_id'      => $wcOrderId,
-                'wc_order_item_id' => $wcOrderItemId,
-                'updated_at'       => gmdate('Y-m-d H:i:s'),
-            ],
-            ['id' => $jobId]
-        );
+    /**
+     * Atomically bind a `draft` Skin Job to a persisted WooCommerce Order & Order Item ID (`> 0`).
+     * Idempotent when called again with the exact same `(wcOrderId, wcOrderItemId)`; rejects conflicts.
+     *
+     * @return bool True if newly bound, false if already identically bound.
+     */
+    public function bindWooCommerceOrderItemIfDraft(
+        int $jobId,
+        int $wcOrderId,
+        int $wcOrderItemId,
+        ?int $expectedCustomerId = null,
+    ): bool {
+        if ($wcOrderId <= 0 || $wcOrderItemId <= 0) {
+            throw SkinValidationException::badRequest(
+                'Persisted WooCommerce order ID and order item ID (> 0) are required before binding a Skin Job.',
+                'djgear_skins_invalid_order_ids'
+            );
+        }
+
+        return $this->transaction(function () use ($jobId, $wcOrderId, $wcOrderItemId, $expectedCustomerId): bool {
+            $locked = $this->findByIdForUpdate($jobId);
+            if ($locked === null) {
+                throw SkinValidationException::notFound('skin_job', 'Custom skin job not found.');
+            }
+
+            if ($expectedCustomerId !== null && $expectedCustomerId > 0 && (int) $locked['customer_user_id'] !== $expectedCustomerId) {
+                throw SkinValidationException::forbidden('Order customer does not own the referenced Skin Job.');
+            }
+
+            // Idempotent replay with identical order & item IDs
+            if ((int) ($locked['wc_order_id'] ?? 0) === $wcOrderId && (int) ($locked['wc_order_item_id'] ?? 0) === $wcOrderItemId) {
+                return false;
+            }
+
+            if ($locked['wc_order_id'] !== null || $locked['wc_order_item_id'] !== null) {
+                throw SkinValidationException::conflict(
+                    'wc_order_id',
+                    'This Skin Job is already bound to another WooCommerce order.'
+                );
+            }
+
+            if ((string) $locked['status'] !== SkinJobStateMachine::STATUS_DRAFT) {
+                throw SkinValidationException::conflict(
+                    'status',
+                    sprintf('Cannot bind Skin Job in "%s" status to a new order.', (string) $locked['status'])
+                );
+            }
+
+            $table = $this->jobsTable();
+            $now = gmdate('Y-m-d H:i:s');
+            $affected = $this->wpdb->query(
+                $this->wpdb->prepare(
+                    "UPDATE `{$table}` SET wc_order_id = %d, wc_order_item_id = %d, status = %s, updated_at = %s WHERE id = %d AND status = %s AND wc_order_id IS NULL AND wc_order_item_id IS NULL",
+                    $wcOrderId,
+                    $wcOrderItemId,
+                    SkinJobStateMachine::STATUS_AWAITING_PAYMENT,
+                    $now,
+                    $jobId,
+                    SkinJobStateMachine::STATUS_DRAFT
+                )
+            );
+
+            if ((int) $affected !== 1) {
+                throw SkinValidationException::conflict('wc_order_id', 'Concurrent order binding conflict on Skin Job.');
+            }
+
+            $this->appendHistory(
+                $jobId,
+                SkinJobStateMachine::STATUS_DRAFT,
+                SkinJobStateMachine::STATUS_AWAITING_PAYMENT,
+                (int) $locked['customer_user_id'],
+                'system',
+                true,
+                sprintf('Linked to WooCommerce order #%d (item #%d).', $wcOrderId, $wcOrderItemId)
+            );
+
+            return true;
+        });
     }
 
     /**
-     * Transition a job's status with server-side state-machine validation and immutable history recording.
+     * Atomically transition a job's status under an InnoDB `FOR UPDATE` row lock + conditional `WHERE status = %s`.
+     * Guarantees status and `djgear_skin_status_history` can never diverge.
      *
      * @param array<string, mixed> $extraFields Optional fields (`tracking_code`, `internal_notes`, `assigned_staff_id`)
      * @return array<string, mixed>
@@ -438,36 +635,86 @@ final class SkinJobRepository
         bool $isCustomerVisible = true,
         ?string $comment = null,
         array $extraFields = [],
+        ?string $expectedFromStatus = null,
     ): array {
-        $job = $this->findById($jobId, false);
-        if ($job === null) {
-            throw SkinValidationException::notFound('skin_job', 'Custom skin job not found.');
-        }
+        $this->transaction(function () use (
+            $jobId,
+            $toStatus,
+            $actorUserId,
+            $actorRole,
+            $isCustomerVisible,
+            $comment,
+            $extraFields,
+            $expectedFromStatus
+        ): void {
+            $job = $this->findByIdForUpdate($jobId);
+            if ($job === null) {
+                throw SkinValidationException::notFound('skin_job', 'Custom skin job not found.');
+            }
 
-        $fromStatus = (string) $job['status'];
-        $snapshot = is_array($job['snapshot'] ?? null) ? $job['snapshot'] : [];
-        $planSnapshot = is_array($snapshot['plan'] ?? null) ? $snapshot['plan'] : [];
-        $requiresProofApproval = (bool) ($planSnapshot['requires_proof_approval'] ?? false);
+            $fromStatus = (string) $job['status'];
+            if ($expectedFromStatus !== null && $fromStatus !== $expectedFromStatus) {
+                throw SkinValidationException::conflict(
+                    'status',
+                    sprintf('Expected job status "%s" but found "%s" (concurrent update detected).', $expectedFromStatus, $fromStatus)
+                );
+            }
 
-        SkinJobStateMachine::assertTransition($fromStatus, $toStatus, $requiresProofApproval);
+            $snapshot = is_array($job['snapshot'] ?? null) ? $job['snapshot'] : [];
+            $planSnapshot = is_array($snapshot['plan'] ?? null) ? $snapshot['plan'] : [];
+            $requiresProofApproval = (bool) ($planSnapshot['requires_proof_approval'] ?? false);
+            $hasApprovedProof = !empty($job['approved_proof_id']);
 
-        $update = [
-            'status'     => $toStatus,
-            'updated_at' => gmdate('Y-m-d H:i:s'),
-        ];
+            SkinJobStateMachine::assertTransition($fromStatus, $toStatus, $requiresProofApproval, $hasApprovedProof);
 
-        if (array_key_exists('tracking_code', $extraFields)) {
-            $update['tracking_code'] = $extraFields['tracking_code'];
-        }
-        if (array_key_exists('internal_notes', $extraFields)) {
-            $update['internal_notes'] = $extraFields['internal_notes'];
-        }
-        if (array_key_exists('assigned_staff_id', $extraFields)) {
-            $update['assigned_staff_id'] = $extraFields['assigned_staff_id'];
-        }
+            $setClauses = ['status = %s', 'updated_at = %s'];
+            $params = [$toStatus, gmdate('Y-m-d H:i:s')];
 
-        $this->wpdb->update($this->jobsTable(), $update, ['id' => $jobId]);
-        $this->appendHistory($jobId, $fromStatus, $toStatus, $actorUserId, $actorRole, $isCustomerVisible, $comment);
+            if (array_key_exists('tracking_code', $extraFields)) {
+                if ($extraFields['tracking_code'] === null) {
+                    $setClauses[] = 'tracking_code = NULL';
+                } else {
+                    $setClauses[] = 'tracking_code = %s';
+                    $params[] = (string) $extraFields['tracking_code'];
+                }
+            }
+            if (array_key_exists('internal_notes', $extraFields)) {
+                if ($extraFields['internal_notes'] === null) {
+                    $setClauses[] = 'internal_notes = NULL';
+                } else {
+                    $setClauses[] = 'internal_notes = %s';
+                    $params[] = (string) $extraFields['internal_notes'];
+                }
+            }
+            if (array_key_exists('assigned_staff_id', $extraFields)) {
+                if ($extraFields['assigned_staff_id'] === null) {
+                    $setClauses[] = 'assigned_staff_id = NULL';
+                } else {
+                    $setClauses[] = 'assigned_staff_id = %d';
+                    $params[] = (int) $extraFields['assigned_staff_id'];
+                }
+            }
+
+            $params[] = $jobId;
+            $params[] = $fromStatus;
+
+            $table = $this->jobsTable();
+            $sql = sprintf(
+                'UPDATE `%s` SET %s WHERE id = %%d AND status = %%s',
+                $table,
+                implode(', ', $setClauses)
+            );
+            $affected = $this->wpdb->query($this->wpdb->prepare($sql, ...$params));
+
+            if ((int) $affected !== 1) {
+                throw SkinValidationException::conflict(
+                    'status',
+                    'Concurrent status transition detected; transition aborted.'
+                );
+            }
+
+            $this->appendHistory($jobId, $fromStatus, $toStatus, $actorUserId, $actorRole, $isCustomerVisible, $comment);
+        });
 
         $reloaded = $this->findById($jobId, true);
         if ($reloaded === null) {
@@ -486,7 +733,7 @@ final class SkinJobRepository
         bool $isCustomerVisible,
         ?string $comment = null,
     ): void {
-        $this->wpdb->insert($this->historyTable(), [
+        $inserted = $this->wpdb->insert($this->historyTable(), [
             'job_id'              => $jobId,
             'from_status'         => $fromStatus,
             'to_status'           => $toStatus,
@@ -496,6 +743,10 @@ final class SkinJobRepository
             'comment'             => $comment,
             'created_at'          => gmdate('Y-m-d H:i:s'),
         ]);
+
+        if ($inserted === false) {
+            throw new SkinValidationException('Failed to append immutable status history row: ' . $this->wpdb->last_error, 500);
+        }
     }
 
     /**
@@ -576,6 +827,7 @@ final class SkinJobRepository
 
         $planSnapshot = is_array($snapshot['plan'] ?? null) ? $snapshot['plan'] : [];
         $requiresProof = (bool) ($planSnapshot['requires_proof_approval'] ?? false);
+        $approvedProofId = isset($row['approved_proof_id']) ? (int) $row['approved_proof_id'] : null;
         $status = (string) ($row['status'] ?? SkinJobStateMachine::STATUS_DRAFT);
 
         $hydrated = [
@@ -593,10 +845,10 @@ final class SkinJobRepository
             'plan_id'            => (int) ($row['plan_id'] ?? 0),
             'snapshot'           => $snapshot,
             'status'             => $status,
-            'allowed_next'       => SkinJobStateMachine::allowedNextStatuses($status, $requiresProof),
+            'allowed_next'       => SkinJobStateMachine::allowedNextStatuses($status, $requiresProof, $approvedProofId !== null, true),
             'current_artwork_id' => isset($row['current_artwork_id']) ? (int) $row['current_artwork_id'] : null,
             'current_proof_id'   => isset($row['current_proof_id']) ? (int) $row['current_proof_id'] : null,
-            'approved_proof_id'  => isset($row['approved_proof_id']) ? (int) $row['approved_proof_id'] : null,
+            'approved_proof_id'  => $approvedProofId,
             'approved_at'        => $row['approved_at'] ?? null,
             'assigned_staff_id'  => isset($row['assigned_staff_id']) ? (int) $row['assigned_staff_id'] : null,
             'customer_notes'     => $row['customer_notes'] ?? null,

@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 
 final class CustomSkinsDomainTest extends TestCase
 {
-    public function testDualTrackStateMachineEnforcesStandardVsCustomDesign(): void
+    public function testDualTrackStateMachineEnforcesStandardVsCustomDesignAndProofApprovalGate(): void
     {
         // Standard plan (requiresProofApproval = false) routes payment directly to queued_for_production
         self::assertSame(
@@ -47,23 +47,38 @@ final class CustomSkinsDomainTest extends TestCase
         self::assertFalse(SkinJobStateMachine::canTransition(
             SkinJobStateMachine::STATUS_AWAITING_PAYMENT,
             SkinJobStateMachine::STATUS_QUEUED_FOR_PRODUCTION,
-            true
+            true,
+            false
         ));
 
-        // Full Custom Design track
-        self::assertTrue(SkinJobStateMachine::canTransition('submitted_for_review', 'in_design_review', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('in_design_review', 'proof_sent', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('proof_sent', 'approved_for_production', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('approved_for_production', 'queued_for_production', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('queued_for_production', 'in_production', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('in_production', 'quality_check', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('quality_check', 'packed', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('packed', 'shipped', true));
-        self::assertTrue(SkinJobStateMachine::canTransition('shipped', 'completed', true));
+        // CRITICAL REGRESSION: Custom-Design job on_hold CANNOT bypass customer proof approval into production!
+        self::assertFalse(SkinJobStateMachine::canTransition('on_hold', 'queued_for_production', true, false));
+        self::assertFalse(SkinJobStateMachine::canTransition('on_hold', 'in_production', true, false));
+        self::assertFalse(SkinJobStateMachine::canTransition('approved_for_production', 'queued_for_production', true, false));
+
+        // Once customer has approved proof (hasApprovedProof = true), production transitions are permitted
+        self::assertTrue(SkinJobStateMachine::canTransition('on_hold', 'queued_for_production', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('on_hold', 'in_production', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('approved_for_production', 'queued_for_production', true, true));
+
+        // Staff allowedNextStatuses NEVER exposes customer-only `approved_for_production`
+        $staffNextFromProof = SkinJobStateMachine::allowedNextStatuses('proof_sent', true, false, true);
+        self::assertNotContains(SkinJobStateMachine::STATUS_APPROVED_FOR_PRODUCTION, $staffNextFromProof);
+
+        // Full Custom Design track with approved proof
+        self::assertTrue(SkinJobStateMachine::canTransition('submitted_for_review', 'in_design_review', true, false));
+        self::assertTrue(SkinJobStateMachine::canTransition('in_design_review', 'proof_sent', true, false));
+        self::assertTrue(SkinJobStateMachine::canTransition('proof_sent', 'approved_for_production', true, false));
+        self::assertTrue(SkinJobStateMachine::canTransition('approved_for_production', 'queued_for_production', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('queued_for_production', 'in_production', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('in_production', 'quality_check', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('quality_check', 'packed', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('packed', 'shipped', true, true));
+        self::assertTrue(SkinJobStateMachine::canTransition('shipped', 'completed', true, true));
 
         // Terminal states cannot transition
-        self::assertFalse(SkinJobStateMachine::canTransition('completed', 'shipped', true));
-        self::assertFalse(SkinJobStateMachine::canTransition('cancelled', 'draft', false));
+        self::assertFalse(SkinJobStateMachine::canTransition('completed', 'shipped', true, true));
+        self::assertFalse(SkinJobStateMachine::canTransition('cancelled', 'draft', false, false));
 
         // Cancellation behavior: pre-production -> cancelled, in-production -> on_hold
         self::assertSame('cancelled', SkinJobStateMachine::statusOnOrderCancel('submitted_for_review'));
@@ -76,30 +91,96 @@ final class CustomSkinsDomainTest extends TestCase
     {
         $validator = new ArtworkDpiValidator();
 
-        // Target: 254mm x 254mm (10 x 10 inches) for clean exact DPI math
-        // 1500x1500 px = 150 DPI -> REJECTED (< 180)
+        // Target: 254mm x 254mm (10 x 10 inches)
         $low = $validator->evaluateDimensions(1500, 1500, 254.0, 254.0);
         self::assertSame(ArtworkDpiValidator::STATUS_REJECTED, $low['dpi_status']);
         self::assertSame(150.0, $low['computed_dpi']);
         self::assertSame(1800, $low['min_required_px_width']);
         self::assertSame(3000, $low['recommended_px_width']);
 
-        // 2200x2200 px = 220 DPI -> WARNING (180-299)
         $warn = $validator->evaluateDimensions(2200, 2200, 254.0, 254.0);
         self::assertSame(ArtworkDpiValidator::STATUS_WARNING, $warn['dpi_status']);
         self::assertSame(220.0, $warn['computed_dpi']);
 
-        // 3000x3000 px = 300 DPI -> PASS (>= 300)
         $pass = $validator->evaluateDimensions(3000, 3000, 254.0, 254.0);
         self::assertSame(ArtworkDpiValidator::STATUS_PASS, $pass['dpi_status']);
         self::assertSame(300.0, $pass['computed_dpi']);
 
-        // Boundary: 180.0 DPI -> WARNING, 179.9 -> REJECTED
         $edgeWarn = $validator->evaluateDimensions(1800, 1800, 254.0, 254.0);
         self::assertSame(ArtworkDpiValidator::STATUS_WARNING, $edgeWarn['dpi_status']);
 
         $edgeReject = $validator->evaluateDimensions(1799, 1799, 254.0, 254.0);
         self::assertSame(ArtworkDpiValidator::STATUS_REJECTED, $edgeReject['dpi_status']);
+    }
+
+    public function testPdfValidatorNeverBlindlyPassesAndDetectsMultipageAndLowResEmbeddedRasters(): void
+    {
+        $validator = new ArtworkDpiValidator();
+        $tmpDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'djgear_pdf_test_' . bin2hex(random_bytes(4));
+        @mkdir($tmpDir, 0750, true);
+
+        // 1. Multi-page PDF -> REJECTED
+        $multiPdf = $tmpDir . DIRECTORY_SEPARATOR . 'multi.pdf';
+        file_put_contents($multiPdf, "%PDF-1.4\n1 0 obj << /Type /Pages /Count 2 >> endobj\n2 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n3 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n%%EOF");
+        $multiReport = $validator->evaluatePdf($multiPdf, 254.0, 254.0);
+        self::assertSame(ArtworkDpiValidator::STATUS_REJECTED, $multiReport['dpi_status']);
+        self::assertSame(2, $multiReport['page_count']);
+
+        // 2. Single-page PDF containing low-res embedded raster image (1000x1000 on 254x254mm = 100 DPI) -> REJECTED
+        $lowResPdf = $tmpDir . DIRECTORY_SEPARATOR . 'lowres-raster.pdf';
+        file_put_contents($lowResPdf, "%PDF-1.4\n1 0 obj << /Type /Pages /Count 1 >> endobj\n2 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n3 0 obj << /Type /XObject /Subtype /Image /Width 1000 /Height 1000 >> endobj\n%%EOF");
+        $lowResReport = $validator->evaluatePdf($lowResPdf, 254.0, 254.0);
+        self::assertSame(ArtworkDpiValidator::STATUS_REJECTED, $lowResReport['dpi_status']);
+        self::assertSame(100.0, $lowResReport['computed_dpi']);
+
+        // 3. Single-page PDF containing 300 DPI embedded raster (3000x3000 on 254x254mm) -> PASS
+        $highResPdf = $tmpDir . DIRECTORY_SEPARATOR . 'highres-raster.pdf';
+        file_put_contents($highResPdf, "%PDF-1.4\n1 0 obj << /Type /Pages /Count 1 >> endobj\n2 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n3 0 obj << /Type /XObject /Subtype /Image /Width 3000 /Height 3000 >> endobj\n%%EOF");
+        $highResReport = $validator->evaluatePdf($highResPdf, 254.0, 254.0);
+        self::assertSame(ArtworkDpiValidator::STATUS_PASS, $highResReport['dpi_status']);
+        self::assertSame(300.0, $highResReport['computed_dpi']);
+
+        // 4. Single-page vector-only PDF (no measurable embedded raster) -> MANUAL_REVIEW_REQUIRED (never silent pass!)
+        $vectorPdf = $tmpDir . DIRECTORY_SEPARATOR . 'vector.pdf';
+        file_put_contents($vectorPdf, "%PDF-1.4\n1 0 obj << /Type /Pages /Count 1 >> endobj\n2 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n%%EOF");
+        $vectorReport = $validator->evaluatePdf($vectorPdf, 254.0, 254.0);
+        self::assertSame(ArtworkDpiValidator::STATUS_MANUAL_REVIEW_REQUIRED, $vectorReport['dpi_status']);
+        self::assertNull($vectorReport['computed_dpi']);
+        self::assertSame(254.0, $vectorReport['pdf_page_mm']['width_mm']);
+
+        @unlink($multiPdf);
+        @unlink($lowResPdf);
+        @unlink($highResPdf);
+        @unlink($vectorPdf);
+        @rmdir($tmpDir);
+    }
+
+    public function testMultipageTiffIsDetectedAndRejected(): void
+    {
+        $validator = new ArtworkDpiValidator();
+        $tmpDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'djgear_tiff_test_' . bin2hex(random_bytes(4));
+        @mkdir($tmpDir, 0750, true);
+
+        // Minimal valid Little-Endian 2-IFD Classic TIFF header (II + 42 + offset 8 -> IFD1(0 entries, next=14) -> IFD2(0 entries, next=0))
+        $twoPageTiffBytes = 'II' . pack('vV', 42, 8) . pack('vV', 0, 14) . pack('vV', 0, 0);
+        $tiffPath = $tmpDir . DIRECTORY_SEPARATOR . 'multipage.tif';
+        file_put_contents($tiffPath, $twoPageTiffBytes);
+
+        self::assertSame(2, $validator->countTiffPages($tiffPath));
+        $report = $validator->evaluateFile($tiffPath, 'image/tiff', 254.0, 254.0);
+        self::assertSame(ArtworkDpiValidator::STATUS_REJECTED, $report['dpi_status']);
+
+        $vault = new CustomerArtworkVault($tmpDir . DIRECTORY_SEPARATOR . 'vault');
+        $rejectedByVault = false;
+        try {
+            $vault->storeFile($tiffPath, 'multipage.tif', '11111111-2222-4333-8444-555555555555', false);
+        } catch (SkinValidationException $e) {
+            $rejectedByVault = ($e->statusCode === 400 && $e->errorCode === 'djgear_skins_multipage_tiff_unsupported');
+        }
+        self::assertTrue($rejectedByVault, 'Multi-page TIFF must be rejected by CustomerArtworkVault.');
+
+        @unlink($tiffPath);
+        @rmdir($tmpDir);
     }
 
     public function testStandardPlanForcesArtworkUploadDisabled(): void
@@ -109,10 +190,10 @@ final class CustomSkinsDomainTest extends TestCase
             'name_fa'                 => 'استاندارد',
             'name_en'                 => 'Standard Fast',
             'plan_type'               => 'standard',
-            'allows_artwork_upload'   => true, // Should be overridden to false
-            'requires_artwork'        => true, // Should be overridden to false
-            'requires_proof_approval' => true, // Should be overridden to false
-            'max_revisions'           => 5,    // Should be overridden to 0
+            'allows_artwork_upload'   => true,
+            'requires_artwork'        => true,
+            'requires_proof_approval' => true,
+            'max_revisions'           => 5,
             'price_surcharge'         => 0,
         ]);
 
@@ -166,14 +247,14 @@ final class CustomSkinsDomainTest extends TestCase
             'assigned_staff_id' => 99,
             'artworks'          => [
                 [
-                    'id'               => 77,
-                    'revision_type'    => 'customer_artwork',
-                    'version_number'   => 1,
-                    'storage_rel_path' => '2026/11/secret/file.png',
+                    'id'                => 77,
+                    'revision_type'     => 'customer_artwork',
+                    'version_number'    => 1,
+                    'storage_rel_path'  => '2026/11/secret/file.png',
                     'original_filename' => 'logo.png',
-                    'mime_type'        => 'image/png',
-                    'file_size_bytes'  => 1234,
-                    'sha256_hash'      => str_repeat('a', 64),
+                    'mime_type'         => 'image/png',
+                    'file_size_bytes'   => 1234,
+                    'sha256_hash'       => str_repeat('a', 64),
                 ],
             ],
             'status_history'    => [
@@ -195,7 +276,6 @@ final class CustomSkinsDomainTest extends TestCase
         $vaultDir = $tmpRoot . DIRECTORY_SEPARATOR . 'djgear-private' . DIRECTORY_SEPARATOR . 'customer-artwork';
         $vault = new CustomerArtworkVault($vaultDir);
 
-        // Generate a real tiny PNG via base64 (1x1 valid PNG)
         $pngBytes = base64_decode(
             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
             true
@@ -226,6 +306,22 @@ final class CustomSkinsDomainTest extends TestCase
         }
         self::assertTrue($traversalBlocked, 'Path traversal should be blocked with 403.');
 
+        // Symlink pointing outside vault root must throw forbidden
+        $outsideFile = $tmpRoot . DIRECTORY_SEPARATOR . 'outside-secret.txt';
+        file_put_contents($outsideFile, 'SECRET');
+        $symlinkRel = 'escape-link.png';
+        $symlinkPath = $vaultDir . DIRECTORY_SEPARATOR . $symlinkRel;
+        if (@symlink($outsideFile, $symlinkPath)) {
+            $symlinkBlocked = false;
+            try {
+                $vault->resolveSafePath($symlinkRel);
+            } catch (SkinValidationException $e) {
+                $symlinkBlocked = ($e->statusCode === 403);
+            }
+            self::assertTrue($symlinkBlocked, 'Symlink pointing outside vault must be blocked with 403.');
+            @unlink($symlinkPath);
+        }
+
         // SVG upload must be rejected
         $tmpSvg = $tmpRoot . DIRECTORY_SEPARATOR . 'xss.svg';
         file_put_contents($tmpSvg, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
@@ -248,11 +344,12 @@ final class CustomSkinsDomainTest extends TestCase
         }
         self::assertTrue($phpRejected, 'PHP payload disguised as PNG must be rejected.');
 
-        // Cleanup temp vault
+        // Cleanup
         $vault->deleteFile($stored['storage_rel_path']);
         @unlink($tmpPng);
         @unlink($tmpSvg);
         @unlink($tmpPhp);
+        @unlink($outsideFile);
     }
 
     public function testRollbackGuardBlocksAccidentalTableDrops(): void

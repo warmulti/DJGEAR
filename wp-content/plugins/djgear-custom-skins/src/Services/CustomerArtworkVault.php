@@ -98,9 +98,11 @@ final class CustomerArtworkVault
             );
         }
 
-        // Extra defense against polyglot files containing PHP tags or raw SVG payloads
-        $head = (string) file_get_contents($sourcePath, false, null, 0, 2048);
-        if (stripos($head, '<?php') !== false || stripos($head, '<svg') !== false || stripos($head, '<script') !== false) {
+        // Extra defense against polyglot files containing PHP tags or raw SVG/script payloads (head 64 KiB + tail 4 KiB)
+        $head = (string) file_get_contents($sourcePath, false, null, 0, 65536);
+        $tail = $fileSize > 65536 ? (string) file_get_contents($sourcePath, false, null, max(0, $fileSize - 4096), 4096) : '';
+        $sample = $head . "\n" . $tail;
+        if (stripos($sample, '<?php') !== false || stripos($sample, '<svg') !== false || stripos($sample, '<script') !== false) {
             throw SkinValidationException::badRequest(
                 'File contains disallowed script or markup signatures.',
                 'djgear_skins_unsafe_payload'
@@ -118,6 +120,16 @@ final class CustomerArtworkVault
         $pixelHeight = null;
         if (str_starts_with($detectedMime, 'image/')) {
             $validator = new ArtworkDpiValidator();
+            if ($detectedMime === 'image/tiff') {
+                $tiffPages = $validator->countTiffPages($sourcePath);
+                if ($tiffPages !== 1) {
+                    throw SkinValidationException::badRequest(
+                        sprintf('Multi-page or unreadable TIFF detected (%d pages). Only single-page TIFF files are accepted.', $tiffPages),
+                        'djgear_skins_multipage_tiff_unsupported',
+                        ['page_count' => $tiffPages]
+                    );
+                }
+            }
             $dims = $validator->extractImageDimensions($sourcePath);
             if ($dims === null) {
                 throw SkinValidationException::badRequest(

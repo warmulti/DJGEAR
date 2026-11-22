@@ -43,7 +43,7 @@ final class AdminSkinCatalogController implements RouteInterface
             [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$this, 'listVariants'],
-                'permission_callback' => $this->authorizer->restPermissionCallback(SkinCapabilities::VIEW_SKIN_ORDERS),
+                'permission_callback' => $this->authorizer->restPermissionCallback(SkinCapabilities::MANAGE_SKIN_CATALOG),
             ],
             [
                 'methods'             => WP_REST_Server::CREATABLE,
@@ -69,7 +69,7 @@ final class AdminSkinCatalogController implements RouteInterface
             [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$this, 'listPlans'],
-                'permission_callback' => $this->authorizer->restPermissionCallback(SkinCapabilities::VIEW_SKIN_ORDERS),
+                'permission_callback' => $this->authorizer->restPermissionCallback(SkinCapabilities::MANAGE_SKIN_PLANS),
             ],
             [
                 'methods'             => WP_REST_Server::CREATABLE,

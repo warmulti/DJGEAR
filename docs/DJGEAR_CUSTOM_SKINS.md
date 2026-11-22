@@ -28,9 +28,14 @@ All tables use `utf8mb4_unicode_ci`, run via idempotent versioned migrations und
 - **Authentication & Plan Guard:** `POST /djgear/v1/skins/jobs/{uuid}/artwork` requires WordPress authentication (`401`), enforces job ownership (`403` for other customers), and rejects uploads on Standard plans (`400`).
 - **Private Storage Vault:** Stored strictly under `/wp-content/uploads/djgear-private/customer-artwork/{YYYY}/{MM}/{job_uuid}/{uuid}.{ext}` with Nginx `deny all` (`403`), `.htaccess`, `index.php`, magic-byte `finfo_file` validation (`image/png`, `image/jpeg`, `image/tiff`, `application/pdf`; blocks PHP/HTML/SVG/JS), 25 MiB limit, `15000×15000` bomb guard, and `realpath()` containment on every authenticated download proxy request (`X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`).
 - **DPI Validation Policy (`ArtworkDpiValidator`):**
-  - `< 180 DPI` → `rejected` (blocked from WooCommerce checkout).
-  - `180–299 DPI` → `warning` (requires explicit customer `POST /acknowledge-dpi` before checkout).
-  - `>= 300 DPI` → `pass` (immediately checkout-ready).
+  - Raster PNG/JPEG & single-page TIFF: `< 180 DPI` → `rejected` (blocked from checkout), `180–299 DPI` → `warning` (requires explicit customer acknowledgment bound to exact `artwork_id` + `sha256_hash`), `>= 300 DPI` → `pass`. Multi-page TIFFs are rejected (`400`).
+  - PDF files: never silently marked DPI-compliant; multi-page PDFs (`page_count !== 1`) and PDFs containing low-res embedded rasters (`< 180 DPI`) are rejected; pure vector or opaque PDFs enter `manual_review_required` (requiring explicit revision+SHA-256 acknowledgment on proof-reviewed plans).
+  - Replacing an artwork revision invalidates all previous acknowledgments.
+  - Approved designer proofs have their on-disk `SHA-256` digest re-verified immediately before entering production (`queued_for_production` / `in_production`).
+- **WooCommerce Cart, Checkout & Order Status Behavior:**
+  - Server-side plan surcharges load canonical active DB product prices (respecting sale prices) idempotently across repeated `woocommerce_before_calculate_totals` passes.
+  - Each Skin Job cart item is locked to `quantity = 1` (1:1 Order Item ↔ Skin Job mapping), deduplicated on add-to-cart, re-validated at the final checkout boundary, and bound atomically post-save via `woocommerce_checkout_order_created` (classic) and `woocommerce_store_api_checkout_order_processed` (Checkout Blocks).
+  - Shipping a Skin Job appends a localized customer-visible WooCommerce order note with tracking info and does **not** automatically change the WooCommerce order status (preventing premature order completion on multi-skin or mixed orders).
 
 ## 4. Capabilities Matrix
 

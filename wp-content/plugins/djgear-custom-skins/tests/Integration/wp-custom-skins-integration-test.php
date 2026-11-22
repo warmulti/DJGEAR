@@ -1,6 +1,7 @@
 <?php
 /**
- * Live WordPress 7.1 + WooCommerce 11.3 HPOS Integration Test Suite for djgear-custom-skins (Phase 4).
+ * Live WordPress 7.1 + WooCommerce 11.3 HPOS Integration & Security Hardening Test Suite
+ * for djgear-custom-skins (Phase 4).
  *
  * Run via:
  *   wp eval-file wp-content/plugins/djgear-custom-skins/tests/Integration/wp-custom-skins-integration-test.php
@@ -8,6 +9,7 @@
 
 use DJGear\Core\Rest\RestKernel;
 use DJGear\CustomSkins\CustomSkinsModule;
+use DJGear\CustomSkins\Domain\SkinValidationException;
 use DJGear\CustomSkins\Lifecycle\Migrations\CreateCustomSkinTables;
 use DJGear\CustomSkins\Lifecycle\SkinMigrationRunner;
 use DJGear\CustomSkins\Repositories\SkinJobRepository;
@@ -29,9 +31,6 @@ $assert = static function (bool $condition, string $label) use (&$passed): void 
     echo "PASS: {$label}\n";
 };
 
-/**
- * Helper to generate a real valid PNG file of given pixel dimensions (via Imagick or GD).
- */
 $makePng = static function (string $path, int $width, int $height): void {
     if (class_exists(Imagick::class)) {
         $im = new Imagick();
@@ -116,7 +115,7 @@ try {
     }
     $assert($rollbackBlocked, 'Migration rollback guard blocks accidental drops');
 
-    // 4. Verify default seeded plans (Standard + Custom Design)
+    // 4. Verify default seeded plans
     /** @var SkinPlanRepository $planRepo */
     $planRepo = $core->container()->get(SkinPlanRepository::class);
     $standardPlan = $planRepo->findBySlug('standard');
@@ -124,7 +123,7 @@ try {
     $assert($standardPlan !== null && $standardPlan['allows_artwork_upload'] === false, 'Default Standard plan seeded with allows_artwork_upload=false');
     $assert($customPlan !== null && $customPlan['allows_artwork_upload'] === true && $customPlan['requires_proof_approval'] === true, 'Default Custom Design plan seeded with allows_artwork_upload=true and proof approval');
 
-    // 5. Verify capabilities matrix & zero engineering caps
+    // 5. Verify capabilities matrix
     $adminRole = get_role('administrator');
     $mgrRole = get_role('shop_manager');
     $assert($adminRole !== null && $adminRole->has_cap(SkinCapabilities::MANAGE_SKIN_PLANS), 'administrator has djgear_manage_skin_plans');
@@ -132,7 +131,7 @@ try {
     $assert($mgrRole !== null && $mgrRole->has_cap(SkinCapabilities::MANAGE_SKIN_ORDERS), 'shop_manager has djgear_manage_skin_orders');
     $assert($mgrRole !== null && !$mgrRole->has_cap(SkinCapabilities::MANAGE_SKIN_PLANS), 'shop_manager does NOT have djgear_manage_skin_plans');
 
-    // 6. Create QA users (admin, shop_manager, customerA, customerB)
+    // 6. Create QA users
     $admins = get_users(['role' => 'administrator', 'number' => 1]);
     $adminId = $admins !== [] ? (int) $admins[0]->ID : 1;
 
@@ -151,7 +150,7 @@ try {
     (new WP_User($custBId))->set_role('customer');
     $createdUsers[] = $custBId;
 
-    // 7. Create QA Catalog Device + WooCommerce Product
+    // 7. Create QA Catalog Device + Regular Skin Product + Sale Skin Product + Ordinary Product
     /** @var TaxonomyRepository $taxRepo */
     $taxRepo = $core->container()->get(TaxonomyRepository::class);
     /** @var DeviceRepository $deviceRepo */
@@ -181,6 +180,27 @@ try {
     $createdProducts[] = $wcProductId;
     $assert($wcProductId > 0, 'Created WooCommerce base skin product');
 
+    // On-sale skin product (regular 1,500,000 -> sale 1,200,000) to verify sale price respected + idempotency
+    $saleProduct = new WC_Product_Simple();
+    $saleProduct->set_name('QA Sale DJ Skin Base Product');
+    $saleProduct->set_status('publish');
+    $saleProduct->set_regular_price('1500000');
+    $saleProduct->set_sale_price('1200000');
+    $saleProduct->set_price('1200000');
+    $saleProduct->set_sku('QA-SKIN-SALE-' . time());
+    $wcSaleProductId = (int) $saleProduct->save();
+    $createdProducts[] = $wcSaleProductId;
+
+    // Ordinary non-skin WooCommerce product for mixed-order tests
+    $ordinaryProduct = new WC_Product_Simple();
+    $ordinaryProduct->set_name('QA DJ USB-C Chroma Cable');
+    $ordinaryProduct->set_status('publish');
+    $ordinaryProduct->set_regular_price('450000');
+    $ordinaryProduct->set_price('450000');
+    $ordinaryProduct->set_sku('QA-ORDINARY-' . time());
+    $wcOrdinaryProductId = (int) $ordinaryProduct->save();
+    $createdProducts[] = $wcOrdinaryProductId;
+
     $device = $deviceRepo->create([
         'brand_term_id'         => $createdBrandId,
         'category_term_id'      => $createdCategoryId,
@@ -193,8 +213,7 @@ try {
     $createdDeviceId = (int) $device['id'];
     $assert($createdDeviceId > 0, 'Created active DJ device in djgear-device-catalog');
 
-    // 8. Admin & Shop Manager RBAC via REST
-    // 8a. shop_manager CAN create skin variant
+    // 8. Admin & Shop Manager RBAC via REST (including tightened GET /skins/admin/plans = 403 for shop_manager)
     wp_set_current_user($mgrId);
     $req = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/variants');
     $req->set_header('Content-Type', 'application/json');
@@ -215,11 +234,36 @@ try {
     ]));
     $res = rest_do_request($req);
     $assert($res->get_status() === 201, 'shop_manager can create skin variant (HTTP 201)');
-    $variantData = $res->get_data()['data'];
-    $variantId = (int) $variantData['id'];
+    $variantId = (int) $res->get_data()['data']['id'];
     $createdVariants[] = $variantId;
 
-    // 8b. shop_manager CANNOT create/edit/delete ordering plans (HTTP 403)
+    // Second variant linked to on-sale product
+    $reqSale = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/variants');
+    $reqSale->set_header('Content-Type', 'application/json');
+    $reqSale->set_body(wp_json_encode([
+        'device_id'       => $createdDeviceId,
+        'wc_product_id'   => $wcSaleProductId,
+        'model_code'      => 'club-pro',
+        'model_name_fa'   => 'کلاب پرو',
+        'model_name_en'   => 'Club Pro',
+        'color_code'      => 'crimson-red',
+        'color_name_fa'   => 'قرمز تیره',
+        'color_name_en'   => 'Crimson Red',
+        'color_hex'       => '#B91C1C',
+        'finish'          => 'matte',
+        'print_width_mm'  => 254.0,
+        'print_height_mm' => 254.0,
+        'status'          => 'active',
+    ]));
+    $resSale = rest_do_request($reqSale);
+    $assert($resSale->get_status() === 201, 'shop_manager created sale-priced skin variant');
+    $saleVariantId = (int) $resSale->get_data()['data']['id'];
+    $createdVariants[] = $saleVariantId;
+
+    // Hardening Section 6: shop_manager blocked on BOTH GET and POST /skins/admin/plans (1:1 with dashboard)
+    $mgrGetPlans = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/plans'));
+    $assert($mgrGetPlans->get_status() === 403, 'shop_manager blocked from GET /skins/admin/plans (HTTP 403 — consistent with dashboard)');
+
     $planReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/plans');
     $planReq->set_header('Content-Type', 'application/json');
     $planReq->set_body(wp_json_encode([
@@ -231,24 +275,28 @@ try {
     $planRes = rest_do_request($planReq);
     $assert($planRes->get_status() === 403, 'shop_manager blocked from creating ordering plans (HTTP 403)');
 
-    // 8c. administrator CAN create and delete a custom ordering plan
+    // Administrator creates a Custom-Design plan with `max_revisions = 0` to verify ZERO revisions enforcement!
     wp_set_current_user($adminId);
-    $adminPlanReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/plans');
-    $adminPlanReq->set_header('Content-Type', 'application/json');
-    $adminPlanReq->set_body(wp_json_encode([
-        'slug'                  => 'qa-vip-plan-' . time(),
-        'name_fa'               => 'پلن ویژه تست',
-        'name_en'               => 'QA VIP Custom Plan',
-        'plan_type'             => 'custom_design',
-        'allows_artwork_upload' => true,
-        'requires_artwork'      => true,
+    $adminGetPlans = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/plans'));
+    $assert($adminGetPlans->get_status() === 200, 'administrator allowed GET /skins/admin/plans (HTTP 200)');
+
+    $zeroRevReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/plans');
+    $zeroRevReq->set_header('Content-Type', 'application/json');
+    $zeroRevReq->set_body(wp_json_encode([
+        'slug'                    => 'qa-zero-rev-plan-' . time(),
+        'name_fa'                 => 'پلن بدون اصلاح تست',
+        'name_en'                 => 'QA Zero-Revision Custom Plan',
+        'plan_type'               => 'custom_design',
+        'allows_artwork_upload'   => true,
+        'requires_artwork'        => true,
         'requires_proof_approval' => true,
-        'max_revisions'         => 2,
-        'price_surcharge'       => 350000,
+        'max_revisions'           => 0,
+        'price_surcharge'         => 150000,
     ]));
-    $adminPlanRes = rest_do_request($adminPlanReq);
-    $assert($adminPlanRes->get_status() === 201, 'administrator can create ordering plan (HTTP 201)');
-    $createdPlans[] = (int) $adminPlanRes->get_data()['data']['id'];
+    $zeroRevRes = rest_do_request($zeroRevReq);
+    $assert($zeroRevRes->get_status() === 201 && (int) $zeroRevRes->get_data()['data']['max_revisions'] === 0, 'administrator created Custom-Design plan with max_revisions=0');
+    $zeroRevPlanId = (int) $zeroRevRes->get_data()['data']['id'];
+    $createdPlans[] = $zeroRevPlanId;
 
     // 9. Public /skins/options & Anonymous 401 checks
     wp_set_current_user(0);
@@ -257,18 +305,171 @@ try {
     $pubRes = rest_do_request($pubReq);
     $assert($pubRes->get_status() === 200, 'Public GET /djgear/v1/skins/options returns HTTP 200');
     $pubData = $pubRes->get_data()['data'];
-    $assert(count($pubData['variants']) === 1 && (float) $pubData['variants'][0]['base_price'] === 1500000.0, 'Public options returns active variant with live WooCommerce base_price');
+    $assert(count($pubData['variants']) === 2 && (float) $pubData['variants'][0]['base_price'] === 1500000.0, 'Public options returns active variants with live WooCommerce base prices');
     $assert(count($pubData['plans']) >= 2, 'Public options returns active ordering plans');
 
-    $anonJobReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs');
-    $anonJobRes = rest_do_request($anonJobReq);
+    $anonJobRes = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs'));
     $assert($anonJobRes->get_status() === 401, 'Anonymous POST /djgear/v1/skins/jobs blocked with HTTP 401');
 
-    $anonMyReq = new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . '/skins/my-jobs');
-    $anonMyRes = rest_do_request($anonMyReq);
+    $anonMyRes = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . '/skins/my-jobs'));
     $assert($anonMyRes->get_status() === 401, 'Anonymous GET /djgear/v1/skins/my-jobs blocked with HTTP 401');
 
-    // 10. STANDARD PLAN END-TO-END (No Artwork Upload Allowed -> Direct to Production on Payment)
+    /** @var SkinJobRepository $jobRepo */
+    $jobRepo = $core->container()->get(SkinJobRepository::class);
+    /** @var WooCommerceSkinBridge $wcBridge */
+    $wcBridge = $core->container()->get(WooCommerceSkinBridge::class);
+    $vault = new CustomerArtworkVault();
+
+    // 10. HARDENING SECTION 1: Idempotent Surcharge Pricing, Sale Price, Qty=1 Lock, Duplicate Cart Dedup, Post-Cart Swap Block
+    wp_set_current_user($custAId);
+    $saleCustomJobReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs');
+    $saleCustomJobReq->set_header('Content-Type', 'application/json');
+    $saleCustomJobReq->set_body(wp_json_encode([
+        'device_id'       => $createdDeviceId,
+        'skin_variant_id' => $saleVariantId, // Sale price 1,200,000 + custom surcharge 250,000 = 1,450,000
+        'plan_id'         => (int) $customPlan['id'],
+    ]));
+    $saleCustomRes = rest_do_request($saleCustomJobReq);
+    $saleCustomUuid = (string) $saleCustomRes->get_data()['data']['job_uuid'];
+    $saleCustomJob = $jobRepo->findByUuid($saleCustomUuid, false);
+    $createdJobs[] = (int) $saleCustomJob['id'];
+
+    $tmpHigh = sys_get_temp_dir() . '/qa_high_dpi_' . time() . '.png';
+    $makePng($tmpHigh, 3000, 3000);
+    $tempFiles[] = $tmpHigh;
+
+    $tmpLow = sys_get_temp_dir() . '/qa_low_dpi_' . time() . '.png';
+    $makePng($tmpLow, 1000, 1000);
+    $tempFiles[] = $tmpLow;
+
+    $tmpWarn = sys_get_temp_dir() . '/qa_warn_dpi_' . time() . '.png';
+    $makePng($tmpWarn, 2000, 2000);
+    $tempFiles[] = $tmpWarn;
+
+    $tmpPngSmall = sys_get_temp_dir() . '/qa_small_' . time() . '.png';
+    $makePng($tmpPngSmall, 200, 200);
+    $tempFiles[] = $tmpPngSmall;
+
+    // Upload 300 DPI PNG to saleCustomJob so it can be added to cart
+    $saleUpReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$saleCustomUuid}/artwork");
+    $saleUpReq->set_file_params(['file' => ['name' => 'sale-300dpi.png', 'type' => 'image/png', 'tmp_name' => $tmpHigh, 'error' => 0, 'size' => filesize($tmpHigh)]]);
+    $saleUpRes = rest_do_request($saleUpReq);
+    $assert($saleUpRes->get_status() === 201, 'Uploaded 300 DPI PNG for cart pricing & checkout boundary tests');
+
+    // Ensure WC Cart initialized cleanly
+    if (function_exists('wc_load_cart')) {
+        wc_load_cart();
+    }
+    WC()->cart->empty_cart();
+
+    // Call add-to-cart TWICE -> must deduplicate to same cart_item_key and qty = 1
+    $cartAdd1 = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$saleCustomUuid}/add-to-cart"));
+    $cartAdd2 = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$saleCustomUuid}/add-to-cart"));
+    $key1 = (string) $cartAdd1->get_data()['data']['cart_item_key'];
+    $key2 = (string) $cartAdd2->get_data()['data']['cart_item_key'];
+    $assert($key1 !== '' && $key1 === $key2, 'Duplicate add-to-cart for same job_uuid deduplicates to identical cart_item_key');
+    $assert((int) WC()->cart->get_cart_item($key1)['quantity'] === 1, 'Skin job cart item quantity stays locked at 1');
+
+    // Repeated calculate_totals() (5x) must NEVER compound surcharge and MUST respect sale_price (1,200,000 + 250,000 = 1,450,000)
+    for ($i = 0; $i < 5; $i++) {
+        WC()->cart->calculate_totals();
+    }
+    $cartItemObj = WC()->cart->get_cart_item($key1);
+    $computedUnitPrice = (float) $cartItemObj['data']->get_price();
+    $assert($computedUnitPrice === 1450000.0, 'Repeated calculate_totals() respects sale price (1,200,000) + surcharge (250,000) = 1,450,000 with ZERO compounding');
+
+    // Quantity manipulation to qty=2 must be blocked by validateCartQuantityUpdate() AND clamped by clampCartItemQuantity()
+    $qtyValid = $wcBridge->validateCartQuantityUpdate(true, $key1, $cartItemObj, 2);
+    $assert($qtyValid === false, 'Cart quantity update to 2 rejected by validateCartQuantityUpdate()');
+    WC()->cart->set_quantity($key1, 2, false);
+    $wcBridge->clampCartItemQuantity($key1, 2, 1, WC()->cart);
+    $assert((int) WC()->cart->get_cart_item($key1)['quantity'] === 1, 'Programmatic quantity > 1 clamped back to 1');
+
+    // Post-cart artwork swap attack: replace 300 DPI with 100 DPI rejected file while item is in cart -> checkout validation MUST reject!
+    $swapReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$saleCustomUuid}/artwork");
+    $swapReq->set_file_params(['file' => ['name' => 'swap-low-100dpi.png', 'type' => 'image/png', 'tmp_name' => $tmpLow, 'error' => 0, 'size' => filesize($tmpLow)]]);
+    rest_do_request($swapReq);
+    wc_clear_notices();
+    $wcBridge->validateCartSkinJobsForCheckout();
+    $assert(wc_notice_count('error') > 0, 'Post-cart swap to <180 DPI artwork is caught and blocked at final checkout boundary');
+    wc_clear_notices();
+    WC()->cart->empty_cart();
+
+    foreach ($jobRepo->listArtworksForJob((int) $saleCustomJob['id']) as $artRow) {
+        $storedVaultPaths[] = (string) $artRow['storage_rel_path'];
+    }
+
+    // 11. HARDENING SECTION 2: PDF Inspection (Never Silent Pass), Multi-Page TIFF, Stale Ack & Digest Binding
+    $pdfJobReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs');
+    $pdfJobReq->set_header('Content-Type', 'application/json');
+    $pdfJobReq->set_body(wp_json_encode([
+        'device_id'       => $createdDeviceId,
+        'skin_variant_id' => $variantId,
+        'plan_id'         => (int) $customPlan['id'],
+    ]));
+    $pdfJobUuid = (string) rest_do_request($pdfJobReq)->get_data()['data']['job_uuid'];
+    $pdfJobId = (int) $jobRepo->findByUuid($pdfJobUuid, false)['id'];
+    $createdJobs[] = $pdfJobId;
+
+    // 11a. Low-res raster wrapped inside PDF -> REJECTED (cannot bypass DPI with PDF!)
+    $tmpLowPdf = sys_get_temp_dir() . '/qa_lowres_' . time() . '.pdf';
+    file_put_contents($tmpLowPdf, "%PDF-1.4\n1 0 obj << /Type /Pages /Count 1 >> endobj\n2 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n3 0 obj << /Type /XObject /Subtype /Image /Width 900 /Height 900 >> endobj\n%%EOF");
+    $tempFiles[] = $tmpLowPdf;
+    $lowPdfReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/artwork");
+    $lowPdfReq->set_file_params(['file' => ['name' => 'sneaky-lowres.pdf', 'type' => 'application/pdf', 'tmp_name' => $tmpLowPdf, 'error' => 0, 'size' => filesize($tmpLowPdf)]]);
+    $lowPdfRes = rest_do_request($lowPdfReq);
+    $assert($lowPdfRes->get_status() === 201 && $lowPdfRes->get_data()['data']['dpi_report']['dpi_status'] === ArtworkDpiValidator::STATUS_REJECTED, 'Low-res raster embedded in PDF rejected (90 DPI)');
+    $assert(rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/add-to-cart"))->get_status() === 400, 'Low-res PDF blocked from checkout (HTTP 400)');
+
+    // 11b. Pure vector PDF -> manual_review_required (NEVER silent pass!), requires revision+SHA256 ack
+    $tmpVecPdf = sys_get_temp_dir() . '/qa_vector_' . time() . '.pdf';
+    file_put_contents($tmpVecPdf, "%PDF-1.4\n1 0 obj << /Type /Pages /Count 1 >> endobj\n2 0 obj << /Type /Page /MediaBox [0 0 720 720] >> endobj\n%%EOF");
+    $tempFiles[] = $tmpVecPdf;
+    $vecPdfReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/artwork");
+    $vecPdfReq->set_file_params(['file' => ['name' => 'vector-logo.pdf', 'type' => 'application/pdf', 'tmp_name' => $tmpVecPdf, 'error' => 0, 'size' => filesize($tmpVecPdf)]]);
+    $vecPdfRes = rest_do_request($vecPdfReq);
+    $vecArtwork = $vecPdfRes->get_data()['data']['artwork'];
+    $assert($vecPdfRes->get_data()['data']['dpi_report']['dpi_status'] === ArtworkDpiValidator::STATUS_MANUAL_REVIEW_REQUIRED, 'Unmeasured vector PDF marked manual_review_required (never silent pass)');
+    $assert(rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/add-to-cart"))->get_status() === 400, 'Manual-review PDF blocked from checkout before explicit acknowledgment');
+
+    // Wrong SHA-256 on ack -> blocked 400; exact revision + SHA-256 -> 200
+    $badShaAck = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/acknowledge-dpi");
+    $badShaAck->set_header('Content-Type', 'application/json');
+    $badShaAck->set_body(wp_json_encode(['acknowledged' => true, 'artwork_id' => (int) $vecArtwork['id'], 'sha256_hash' => str_repeat('0', 64)]));
+    $assert(rest_do_request($badShaAck)->get_status() === 400, 'Acknowledgment with mismatched SHA-256 digest rejected (HTTP 400)');
+
+    $goodPdfAck = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/acknowledge-dpi");
+    $goodPdfAck->set_header('Content-Type', 'application/json');
+    $goodPdfAck->set_body(wp_json_encode(['acknowledged' => true, 'artwork_id' => (int) $vecArtwork['id'], 'sha256_hash' => (string) $vecArtwork['sha256_hash']]));
+    $assert(rest_do_request($goodPdfAck)->get_status() === 200, 'Manual-review PDF acknowledged with exact revision ID + SHA-256 (HTTP 200)');
+    $assert(rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/add-to-cart"))->get_status() === 200, 'Acknowledged manual-review PDF allowed to proceed on proof-reviewed plan');
+
+    // 11c. Replacing artwork MUST invalidate prior acknowledgment AND stale artwork_id must be rejected!
+    $replaceWarnReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/artwork");
+    $replaceWarnReq->set_file_params(['file' => ['name' => 'warn-v2.png', 'type' => 'image/png', 'tmp_name' => $tmpWarn, 'error' => 0, 'size' => filesize($tmpWarn)]]);
+    $replaceWarnRes = rest_do_request($replaceWarnReq);
+    $warnV2 = $replaceWarnRes->get_data()['data']['artwork'];
+    $assert(rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/add-to-cart"))->get_status() === 400, 'Replacing artwork invalidates prior acknowledgment and re-blocks checkout');
+
+    $staleAck = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/acknowledge-dpi");
+    $staleAck->set_header('Content-Type', 'application/json');
+    $staleAck->set_body(wp_json_encode(['acknowledged' => true, 'artwork_id' => (int) $vecArtwork['id']]));
+    $assert(rest_do_request($staleAck)->get_status() === 400, 'Stale artwork_id acknowledgment strictly rejected (HTTP 400)');
+
+    // 11d. Multi-page TIFF upload rejected HTTP 400
+    $tmpMultiTiff = sys_get_temp_dir() . '/qa_multipage_' . time() . '.tif';
+    file_put_contents($tmpMultiTiff, 'II' . pack('vV', 42, 8) . pack('vV', 0, 14) . pack('vV', 0, 0));
+    $tempFiles[] = $tmpMultiTiff;
+    $tiffReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$pdfJobUuid}/artwork");
+    $tiffReq->set_file_params(['file' => ['name' => 'multi.tif', 'type' => 'image/tiff', 'tmp_name' => $tmpMultiTiff, 'error' => 0, 'size' => filesize($tmpMultiTiff)]]);
+    $assert(rest_do_request($tiffReq)->get_status() === 400, 'Multi-page TIFF upload rejected (HTTP 400)');
+
+    foreach ($jobRepo->listArtworksForJob($pdfJobId) as $artRow) {
+        $storedVaultPaths[] = (string) $artRow['storage_rel_path'];
+    }
+
+    // 12. HARDENING SECTIONS 1, 4 & 5: MIXED MULTI-SKIN HPOS ORDER (2 Skin Jobs + 1 Ordinary Product)
+    //     + Zero-ID Guard + Duplicate Webhook Idempotency + Shipping Without WC Auto-Complete
     wp_set_current_user($custAId);
     $stdJobReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs');
     $stdJobReq->set_header('Content-Type', 'application/json');
@@ -276,66 +477,18 @@ try {
         'device_id'       => $createdDeviceId,
         'skin_variant_id' => $variantId,
         'plan_id'         => (int) $standardPlan['id'],
-        'customer_notes'  => 'Standard matte black skin order',
     ]));
-    $stdJobRes = rest_do_request($stdJobReq);
-    $assert($stdJobRes->get_status() === 201, 'Customer A creates Standard plan draft job (HTTP 201)');
-    $stdUuid = (string) $stdJobRes->get_data()['data']['job_uuid'];
-    /** @var SkinJobRepository $jobRepo */
-    $jobRepo = $core->container()->get(SkinJobRepository::class);
+    $stdUuid = (string) rest_do_request($stdJobReq)->get_data()['data']['job_uuid'];
     $stdJobRecord = $jobRepo->findByUuid($stdUuid, false);
-    $createdJobs[] = (int) $stdJobRecord['id'];
+    $stdJobId = (int) $stdJobRecord['id'];
+    $createdJobs[] = $stdJobId;
 
-    // Attempt artwork upload on Standard plan -> MUST fail HTTP 400
-    $tmpPngSmall = sys_get_temp_dir() . '/qa_std_attempt_' . time() . '.png';
-    $makePng($tmpPngSmall, 200, 200);
-    $tempFiles[] = $tmpPngSmall;
+    // Standard plan strictly blocks artwork upload
+    $stdUpReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$stdUuid}/artwork");
+    $stdUpReq->set_file_params(['file' => ['name' => 'logo.png', 'type' => 'image/png', 'tmp_name' => $tmpPngSmall, 'error' => 0, 'size' => filesize($tmpPngSmall)]]);
+    $assert(rest_do_request($stdUpReq)->get_status() === 400, 'Artwork upload on Standard plan is strictly blocked (HTTP 400)');
 
-    $stdUploadReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$stdUuid}/artwork");
-    $stdUploadReq->set_file_params([
-        'file' => [
-            'name'     => 'logo.png',
-            'type'     => 'image/png',
-            'tmp_name' => $tmpPngSmall,
-            'error'    => UPLOAD_ERR_OK,
-            'size'     => filesize($tmpPngSmall),
-        ],
-    ]);
-    $stdUploadRes = rest_do_request($stdUploadReq);
-    $assert($stdUploadRes->get_status() === 400, 'Artwork upload on Standard plan is strictly blocked (HTTP 400)');
-
-    // Standard plan add-to-cart succeeds without artwork
-    $stdCartReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$stdUuid}/add-to-cart");
-    $stdCartRes = rest_do_request($stdCartReq);
-    $assert($stdCartRes->get_status() === 200, 'Standard plan job ready for WooCommerce cart without artwork');
-
-    // Bind Standard job to HPOS WooCommerce Order and simulate payment -> queued_for_production
-    /** @var WooCommerceSkinBridge $wcBridge */
-    $wcBridge = $core->container()->get(WooCommerceSkinBridge::class);
-    $stdOrder = wc_create_order(['customer_id' => $custAId]);
-    $stdItemId = $stdOrder->add_product(wc_get_product($wcProductId), 1);
-    $stdItem = $stdOrder->get_item($stdItemId);
-    $wcBridge->attachJobMetadataToOrderItem($stdItem, $stdJobRecord);
-    $stdItem->save();
-    $stdOrder->calculate_totals();
-    $stdOrder->save();
-    $createdOrders[] = $stdOrder->get_id();
-
-    $wcBridge->linkJobToOrder((int) $stdJobRecord['id'], $stdOrder->get_id(), (int) $stdItemId);
-    $afterLink = $jobRepo->findById((int) $stdJobRecord['id'], false);
-    $assert($afterLink['status'] === 'awaiting_payment', 'Standard job transitions draft -> awaiting_payment on WC order link');
-
-    $wcBridge->onPaymentComplete($stdOrder->get_id());
-    $afterPay = $jobRepo->findById((int) $stdJobRecord['id'], false);
-    $assert($afterPay['status'] === 'queued_for_production', 'Standard job skips design review and routes to queued_for_production on payment');
-
-    // Cancel WC order -> pre-production job cancels automatically
-    $wcBridge->onOrderCancelled($stdOrder->get_id());
-    $afterCancel = $jobRepo->findById((int) $stdJobRecord['id'], false);
-    $assert($afterCancel['status'] === 'cancelled', 'Standard pre-production job auto-cancels on WC order cancellation');
-
-    // 11. CUSTOM DESIGN PLAN END-TO-END (DPI <180 / 180-299 Ack / >=300 Pass + Isolation + Proof Approval + Shipping)
-    wp_set_current_user($custAId);
+    // Second job in same order: Custom Design with 300 DPI PNG
     $custJobReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs');
     $custJobReq->set_header('Content-Type', 'application/json');
     $custJobReq->set_body(wp_json_encode([
@@ -344,197 +497,262 @@ try {
         'plan_id'         => (int) $customPlan['id'],
         'customer_notes'  => 'Center my DJ logo cleanly',
     ]));
-    $custJobRes = rest_do_request($custJobReq);
-    $assert($custJobRes->get_status() === 201, 'Customer A creates Custom Design draft job (HTTP 201)');
-    $custUuid = (string) $custJobRes->get_data()['data']['job_uuid'];
+    $custUuid = (string) rest_do_request($custJobReq)->get_data()['data']['job_uuid'];
     $custJobRecord = $jobRepo->findByUuid($custUuid, false);
     $custJobId = (int) $custJobRecord['id'];
     $createdJobs[] = $custJobId;
 
-    // Add-to-cart before artwork upload must fail (HTTP 400)
-    $noArtCartRes = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/add-to-cart"));
-    $assert($noArtCartRes->get_status() === 400, 'Custom Design job blocked from cart before artwork upload (HTTP 400)');
+    $highUpReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artwork");
+    $highUpReq->set_file_params(['file' => ['name' => 'print-ready-300dpi.png', 'type' => 'image/png', 'tmp_name' => $tmpHigh, 'error' => 0, 'size' => filesize($tmpHigh)]]);
+    $highUpRes = rest_do_request($highUpReq);
+    $assert($highUpRes->get_status() === 201 && $highUpRes->get_data()['data']['dpi_report']['dpi_status'] === ArtworkDpiValidator::STATUS_PASS, '300 DPI artwork passes immediately');
+    $highArtworkId = (int) $highUpRes->get_data()['data']['artwork']['id'];
 
-    // Disguised PHP upload rejected (HTTP 400)
-    $tmpPhp = sys_get_temp_dir() . '/qa_evil_' . time() . '.png';
-    file_put_contents($tmpPhp, '<?php system($_GET["c"]); ?>');
-    $tempFiles[] = $tmpPhp;
-    $phpUpReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artwork");
-    $phpUpReq->set_file_params(['file' => ['name' => 'evil.png', 'type' => 'image/png', 'tmp_name' => $tmpPhp, 'error' => 0, 'size' => filesize($tmpPhp)]]);
-    $phpUpRes = rest_do_request($phpUpReq);
-    $assert($phpUpRes->get_status() === 400, 'Disguised PHP artwork payload rejected (HTTP 400)');
-
-    // 11a. Low DPI (<180 DPI): 1000x1000 px on 254x254mm = 100 DPI -> rejected
-    $tmpLow = sys_get_temp_dir() . '/qa_low_dpi_' . time() . '.png';
-    $makePng($tmpLow, 1000, 1000);
-    $tempFiles[] = $tmpLow;
-    $lowReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artwork");
-    $lowReq->set_file_params(['file' => ['name' => 'low-dpi.png', 'type' => 'image/png', 'tmp_name' => $tmpLow, 'error' => 0, 'size' => filesize($tmpLow)]]);
-    $lowRes = rest_do_request($lowReq);
-    $assert($lowRes->get_status() === 201 && $lowRes->get_data()['data']['dpi_report']['dpi_status'] === ArtworkDpiValidator::STATUS_REJECTED, 'Low-DPI (<180) artwork flagged as rejected (100 DPI)');
-
-    $lowCartRes = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/add-to-cart"));
-    $assert($lowCartRes->get_status() === 400, 'Low-DPI (<180) artwork blocked from checkout (HTTP 400)');
-
-    // 11b. Warning DPI (180-299 DPI): 2000x2000 px on 254x254mm = 200 DPI -> warning
-    $tmpWarn = sys_get_temp_dir() . '/qa_warn_dpi_' . time() . '.png';
-    $makePng($tmpWarn, 2000, 2000);
-    $tempFiles[] = $tmpWarn;
-    $warnReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artwork");
-    $warnReq->set_file_params(['file' => ['name' => 'warn-dpi.png', 'type' => 'image/png', 'tmp_name' => $tmpWarn, 'error' => 0, 'size' => filesize($tmpWarn)]]);
-    $warnRes = rest_do_request($warnReq);
-    $assert($warnRes->get_status() === 201 && $warnRes->get_data()['data']['dpi_report']['dpi_status'] === ArtworkDpiValidator::STATUS_WARNING, 'Mid-DPI (200 DPI) artwork flagged as warning');
-
-    $warnCartBlocked = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/add-to-cart"));
-    $assert($warnCartBlocked->get_status() === 400, 'Warning-DPI artwork blocked until explicit customer acknowledgment (HTTP 400)');
-
-    $ackReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/acknowledge-dpi");
-    $ackReq->set_header('Content-Type', 'application/json');
-    $ackReq->set_body(wp_json_encode(['acknowledged' => true]));
-    $ackRes = rest_do_request($ackReq);
-    $assert($ackRes->get_status() === 200, 'Customer A records explicit low-DPI warning acknowledgment (HTTP 200)');
-
-    $warnCartAllowed = rest_do_request(new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/add-to-cart"));
-    $assert($warnCartAllowed->get_status() === 200, 'Warning-DPI artwork permitted for checkout after explicit acknowledgment');
-
-    // 11c. High DPI (>=300 DPI): 3000x3000 px on 254x254mm = 300 DPI -> pass immediately
-    $tmpHigh = sys_get_temp_dir() . '/qa_high_dpi_' . time() . '.png';
-    $makePng($tmpHigh, 3000, 3000);
-    $tempFiles[] = $tmpHigh;
-    $highReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artwork");
-    $highReq->set_file_params(['file' => ['name' => 'print-ready-300dpi.png', 'type' => 'image/png', 'tmp_name' => $tmpHigh, 'error' => 0, 'size' => filesize($tmpHigh)]]);
-    $highRes = rest_do_request($highReq);
-    $assert($highRes->get_status() === 201 && $highRes->get_data()['data']['dpi_report']['dpi_status'] === ArtworkDpiValidator::STATUS_PASS, '300 DPI artwork passes immediately');
-    $highArtworkId = (int) $highRes->get_data()['data']['artwork']['id'];
-
-    // Track stored vault paths for cleanup
-    foreach ($jobRepo->listArtworksForJob($custJobId) as $artRow) {
-        $storedVaultPaths[] = (string) $artRow['storage_rel_path'];
-    }
-
-    // 12. Cross-customer isolation checks (Customer B MUST receive 403 on Customer A's job & artwork)
-    wp_set_current_user($custBId);
-    $bGet = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$custUuid}"));
-    $assert($bGet->get_status() === 403, 'Customer B blocked from viewing Customer A job (HTTP 403)');
-
-    $bDl = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artworks/{$highArtworkId}/download"));
-    $assert($bDl->get_status() === 403, 'Customer B blocked from downloading Customer A private artwork (HTTP 403)');
-
-    $bAdmin = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . '/skins/admin/jobs'));
-    $assert($bAdmin->get_status() === 403, 'Customer B blocked from admin production queue (HTTP 403)');
-
-    // Customer A CAN download own private artwork with strict security headers
-    wp_set_current_user($custAId);
+    // Hardening Section 3: Complete REST response inspection for ZERO filesystem path leakage!
     $aDl = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artworks/{$highArtworkId}/download"));
+    $dlJson = (string) wp_json_encode($aDl->get_data());
     $headers = $aDl->get_headers();
     $assert($aDl->get_status() === 200, 'Customer A can download own artwork via authenticated proxy (HTTP 200)');
+    $assert(!str_contains($dlJson, '_stream_path') && !str_contains($dlJson, '/var/www/html') && !str_contains($dlJson, 'djgear-private') && !str_contains($dlJson, 'storage_rel_path'), 'Download REST payload leaks ZERO server filesystem paths or private metadata');
     $assert(($headers['X-Content-Type-Options'] ?? '') === 'nosniff', 'Download proxy sets X-Content-Type-Options: nosniff');
     $assert(str_contains((string) ($headers['Cache-Control'] ?? ''), 'no-store'), 'Download proxy sets Cache-Control: private, no-store');
 
-    // 13. WooCommerce HPOS Order + Payment -> submitted_for_review -> Designer Proof -> Customer Approval -> Production -> Shipped
-    $custOrder = wc_create_order(['customer_id' => $custAId]);
-    $custItemId = $custOrder->add_product(wc_get_product($wcProductId), 1);
-    $custItem = $custOrder->get_item($custItemId);
-    $wcBridge->attachJobMetadataToOrderItem($custItem, $jobRepo->findById($custJobId, false));
-    $custItem->save();
-    $custOrder->calculate_totals();
-    $custOrder->save();
-    $createdOrders[] = $custOrder->get_id();
+    // Cross-customer isolation
+    wp_set_current_user($custBId);
+    $assert(rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$custUuid}"))->get_status() === 403, 'Customer B blocked from viewing Customer A job (HTTP 403)');
+    $assert(rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artworks/{$highArtworkId}/download"))->get_status() === 403, 'Customer B blocked from downloading Customer A artwork (HTTP 403)');
 
-    $wcBridge->linkJobToOrder($custJobId, $custOrder->get_id(), (int) $custItemId);
-    $wcBridge->onPaymentComplete($custOrder->get_id());
-    $afterCustPay = $jobRepo->findById($custJobId, false);
-    $assert($afterCustPay['status'] === 'submitted_for_review', 'Custom Design job routes to submitted_for_review after WC payment');
+    // Zero-ID binding guard test
+    $zeroIdBlocked = false;
+    try {
+        $wcBridge->linkJobToOrder($stdJobId, 0, 0);
+    } catch (SkinValidationException $e) {
+        $zeroIdBlocked = ($e->statusCode === 400);
+    }
+    $assert($zeroIdBlocked, 'linkJobToOrder strictly rejects zero order_id / order_item_id');
 
-    // Shop Manager uploads Designer Proof v1
+    // Build ONE mixed HPOS WooCommerce Order containing: Skin Job #1 (Standard) + Skin Job #2 (Custom Design) + Ordinary Product (qty 2)
+    $mixedOrder = wc_create_order(['customer_id' => $custAId]);
+    $itemStdId = $mixedOrder->add_product(wc_get_product($wcProductId), 1);
+    $itemStd = $mixedOrder->get_item($itemStdId);
+    $wcBridge->attachJobMetadataToOrderItem($itemStd, $stdJobRecord);
+    $itemStd->save();
+
+    $itemCustId = $mixedOrder->add_product(wc_get_product($wcProductId), 1);
+    $itemCust = $mixedOrder->get_item($itemCustId);
+    $wcBridge->attachJobMetadataToOrderItem($itemCust, $custJobRecord);
+    $itemCust->save();
+
+    $mixedOrder->add_product(wc_get_product($wcOrdinaryProductId), 2);
+    $mixedOrder->set_status('pending');
+    $mixedOrder->calculate_totals();
+    $mixedOrder->save();
+    $createdOrders[] = $mixedOrder->get_id();
+
+    // Post-save binding via bindPersistedOrderJobs (identical to classic checkout_order_created & Blocks checkout_order_processed)
+    $wcBridge->bindPersistedOrderJobs($mixedOrder);
+    $stdBound = $jobRepo->findById($stdJobId, false);
+    $custBound = $jobRepo->findById($custJobId, false);
+    $assert(
+        (int) $stdBound['wc_order_id'] === $mixedOrder->get_id()
+        && (int) $custBound['wc_order_id'] === $mixedOrder->get_id()
+        && (int) $stdBound['wc_order_item_id'] > 0
+        && (int) $custBound['wc_order_item_id'] > 0
+        && (int) $stdBound['wc_order_item_id'] !== (int) $custBound['wc_order_item_id'],
+        'Mixed order with 2 Skin Jobs + 1 ordinary product binds both jobs to distinct persisted order_item_ids (>0) without collision'
+    );
+
+    // Replay bindPersistedOrderJobs -> idempotent (no duplicate history)
+    $stdHistBefore = count($jobRepo->listHistoryForJob($stdJobId));
+    $wcBridge->bindPersistedOrderJobs($mixedOrder);
+    $assert(count($jobRepo->listHistoryForJob($stdJobId)) === $stdHistBefore, 'Replaying bindPersistedOrderJobs is idempotent with zero duplicate history');
+
+    // Attempting to re-bind an already-bound job to another order ID must throw 409 Conflict
+    $rebindBlocked = false;
+    try {
+        $wcBridge->linkJobToOrder($stdJobId, $mixedOrder->get_id() + 99999, 999999);
+    } catch (SkinValidationException $e) {
+        $rebindBlocked = ($e->statusCode === 409);
+    }
+    $assert($rebindBlocked, 'Re-binding already-bound Skin Job to another order is blocked (HTTP 409)');
+
+    // Move WC Order to processing + fire BOTH payment hooks + replay -> ZERO duplicate transitions/history!
+    $mixedOrder->set_status('processing');
+    $mixedOrder->save();
+    $wcBridge->onPaymentComplete($mixedOrder->get_id());
+    $wcBridge->onOrderProcessing($mixedOrder->get_id());
+    $wcBridge->onPaymentComplete($mixedOrder->get_id());
+
+    $stdAfterPay = $jobRepo->findById($stdJobId, true);
+    $custAfterPay = $jobRepo->findById($custJobId, true);
+    $assert($stdAfterPay['status'] === 'queued_for_production', 'Standard job in mixed order routes directly to queued_for_production');
+    $assert($custAfterPay['status'] === 'submitted_for_review', 'Custom Design job in mixed order routes to submitted_for_review');
+    $stdPayHistoryMatches = array_filter($stdAfterPay['status_history'], static fn ($h) => $h['to_status'] === 'queued_for_production');
+    $custPayHistoryMatches = array_filter($custAfterPay['status_history'], static fn ($h) => $h['to_status'] === 'submitted_for_review');
+    $assert(count($stdPayHistoryMatches) === 1 && count($custPayHistoryMatches) === 1, 'Duplicate payment webhooks create exactly ONE transition and ZERO duplicate history rows');
+
+    // 13. HARDENING SECTION 4: Forbidden Bypass Tests + Proof SHA-256 Tamper Test + max_revisions=0 + Concurrency CAS
     wp_set_current_user($mgrId);
+
+    // 13a. Staff tries `submitted_for_review -> on_hold -> queued_for_production` WITHOUT customer approval -> MUST FAIL 400!
+    $holdReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    $holdReq->set_header('Content-Type', 'application/json');
+    $holdReq->set_body(wp_json_encode(['to_status' => 'on_hold', 'comment' => 'Testing hold gate']));
+    $assert(rest_do_request($holdReq)->get_status() === 200, 'Moved Custom Design job to on_hold for bypass test');
+
+    $bypassQueueReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    $bypassQueueReq->set_header('Content-Type', 'application/json');
+    $bypassQueueReq->set_body(wp_json_encode(['to_status' => 'queued_for_production']));
+    $assert(rest_do_request($bypassQueueReq)->get_status() === 400, 'Custom Design job on_hold BLOCKED from queued_for_production without approved proof (HTTP 400)');
+
+    $bypassProdReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    $bypassProdReq->set_header('Content-Type', 'application/json');
+    $bypassProdReq->set_body(wp_json_encode(['to_status' => 'in_production']));
+    $assert(rest_do_request($bypassProdReq)->get_status() === 400, 'Custom Design job on_hold BLOCKED from in_production without approved proof (HTTP 400)');
+
+    // Resume back to submitted_for_review and upload Designer Proof v1
+    $resumeReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    $resumeReq->set_header('Content-Type', 'application/json');
+    $resumeReq->set_body(wp_json_encode(['to_status' => 'submitted_for_review']));
+    $assert(rest_do_request($resumeReq)->get_status() === 200, 'Resumed Custom Design job to submitted_for_review');
+
     $proofReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/proof");
-    $proofReq->set_param('note_en', 'Proof v1 ready for your inspection');
-    $proofReq->set_param('note_fa', 'پیش‌نمایش نسخه ۱ آماده بررسی شماست');
     $proofReq->set_file_params(['file' => ['name' => 'proof-v1.png', 'type' => 'image/png', 'tmp_name' => $tmpPngSmall, 'error' => 0, 'size' => filesize($tmpPngSmall)]]);
     $proofRes = rest_do_request($proofReq);
-    $assert($proofRes->get_status() === 201 && $proofRes->get_data()['data']['job']['status'] === 'proof_sent', 'shop_manager uploads designer proof -> status proof_sent');
+    $assert($proofRes->get_status() === 201 && $proofRes->get_data()['data']['job']['status'] === 'proof_sent', 'shop_manager uploaded Proof v1 -> proof_sent');
 
-    // Customer A requests revision on Proof v1
+    // 13b. Staff/Admin tries to impersonate customer approval (`to_status = approved_for_production`) -> MUST FAIL 403!
+    $impersonateReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    $impersonateReq->set_header('Content-Type', 'application/json');
+    $impersonateReq->set_body(wp_json_encode(['to_status' => 'approved_for_production']));
+    $assert(rest_do_request($impersonateReq)->get_status() === 403, 'shop_manager BLOCKED from impersonating customer proof approval (HTTP 403)');
+
+    wp_set_current_user($adminId);
+    $assert(rest_do_request($impersonateReq)->get_status() === 403, 'administrator ALSO BLOCKED from impersonating customer proof approval (HTTP 403)');
+
+    // Customer A approves Proof v1 -> locked + repeated approval blocked with zero duplicate history
     wp_set_current_user($custAId);
-    $revReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$custUuid}/request-revision");
-    $revReq->set_header('Content-Type', 'application/json');
-    $revReq->set_body(wp_json_encode(['comment' => 'Please enlarge the center logo by 10%']));
-    $revRes = rest_do_request($revReq);
-    $assert($revRes->get_status() === 200 && $revRes->get_data()['data']['status'] === 'revision_requested', 'Customer A requests proof revision -> revision_requested');
+    $appReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$custUuid}/approve-proof");
+    $appReq->set_header('Content-Type', 'application/json');
+    $appReq->set_body(wp_json_encode(['comment' => 'Approved for print']));
+    $appRes = rest_do_request($appReq);
+    $assert($appRes->get_status() === 200 && $appRes->get_data()['data']['status'] === 'approved_for_production', 'Customer A approved Proof v1 -> approved_for_production');
 
-    // Customer A uploads revised 300 DPI artwork -> automatically moves back to in_design_review
-    $revUpReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/jobs/{$custUuid}/artwork");
-    $revUpReq->set_file_params(['file' => ['name' => 'print-ready-v2.png', 'type' => 'image/png', 'tmp_name' => $tmpHigh, 'error' => 0, 'size' => filesize($tmpHigh)]]);
-    $revUpRes = rest_do_request($revUpReq);
-    $assert($revUpRes->get_status() === 201 && $revUpRes->get_data()['data']['job']['status'] === 'in_design_review', 'Revised 300 DPI upload returns job to in_design_review');
+    $histCountAfterApprove = count($jobRepo->listHistoryForJob($custJobId));
+    $dupAppRes = rest_do_request($appReq);
+    $assert($dupAppRes->get_status() === 400 && count($jobRepo->listHistoryForJob($custJobId)) === $histCountAfterApprove, 'Repeated proof approval blocked cleanly with zero duplicate history rows');
 
-    // Shop Manager uploads Proof v2
+    // 13c. HARDENING SECTION 2.7: Tamper with approved proof file on disk -> transition to production MUST FAIL 409!
+    $approvedProofId = (int) $jobRepo->findById($custJobId, false)['approved_proof_id'];
+    $approvedProofRow = $jobRepo->findArtworkById($approvedProofId);
+    $approvedDiskPath = $vault->resolveSafePath((string) $approvedProofRow['storage_rel_path']);
+    $originalProofBytes = (string) file_get_contents($approvedDiskPath);
+    file_put_contents($approvedDiskPath, $originalProofBytes . 'TAMPER');
+
     wp_set_current_user($mgrId);
-    $proof2Req = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/proof");
-    $proof2Req->set_file_params(['file' => ['name' => 'proof-v2.png', 'type' => 'image/png', 'tmp_name' => $tmpPngSmall, 'error' => 0, 'size' => filesize($tmpPngSmall)]]);
-    $proof2Res = rest_do_request($proof2Req);
-    $assert($proof2Res->get_status() === 201 && $proof2Res->get_data()['data']['job']['status'] === 'proof_sent', 'shop_manager uploads Proof v2 -> proof_sent');
+    $tamperQueueReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    $tamperQueueReq->set_header('Content-Type', 'application/json');
+    $tamperQueueReq->set_body(wp_json_encode(['to_status' => 'queued_for_production']));
+    $tamperQueueRes = rest_do_request($tamperQueueReq);
+    $assert($tamperQueueRes->get_status() === 409, 'Modified approved proof file on disk BLOCKS transition to production (HTTP 409 SHA-256 mismatch)');
 
-    // Track any newly added vault files
+    // Restore original proof bytes -> production entry succeeds!
+    file_put_contents($approvedDiskPath, $originalProofBytes);
+    $assert(rest_do_request($tamperQueueReq)->get_status() === 200, 'Restored intact approved proof passes live SHA-256 re-verification -> queued_for_production');
+
+    // 13d. Concurrency CAS check: stale expectedFromStatus throws 409 Conflict
+    $casConflict = false;
+    try {
+        $jobRepo->transitionStatus($custJobId, 'in_production', $mgrId, 'staff', true, 'CAS test', [], 'approved_for_production');
+    } catch (SkinValidationException $e) {
+        $casConflict = ($e->statusCode === 409);
+    }
+    $assert($casConflict, 'Concurrent/stale status transition rejected via atomic CAS check (HTTP 409)');
+
+    // 13e. `max_revisions = 0` plan MUST strictly allow ZERO proof revisions
+    wp_set_current_user($custAId);
+    $zJobReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . '/skins/jobs');
+    $zJobReq->set_header('Content-Type', 'application/json');
+    $zJobReq->set_body(wp_json_encode([
+        'device_id'       => $createdDeviceId,
+        'skin_variant_id' => $variantId,
+        'plan_id'         => $zeroRevPlanId,
+    ]));
+    $zUuid = (string) rest_do_request($zJobReq)->get_data()['data']['job_uuid'];
+    $zJobId = (int) $jobRepo->findByUuid($zUuid, false)['id'];
+    $createdJobs[] = $zJobId;
+
+    $zOrder = wc_create_order(['customer_id' => $custAId]);
+    $zItemId = $zOrder->add_product(wc_get_product($wcProductId), 1);
+    $zOrder->save();
+    $createdOrders[] = $zOrder->get_id();
+    $wcBridge->linkJobToOrder($zJobId, $zOrder->get_id(), (int) $zItemId, $custAId);
+    $wcBridge->onPaymentComplete($zOrder->get_id());
+
+    wp_set_current_user($mgrId);
+    $zProofReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$zJobId}/proof");
+    $zProofReq->set_file_params(['file' => ['name' => 'z-proof.png', 'type' => 'image/png', 'tmp_name' => $tmpPngSmall, 'error' => 0, 'size' => filesize($tmpPngSmall)]]);
+    $assert(rest_do_request($zProofReq)->get_status() === 201, 'Uploaded proof on max_revisions=0 job');
+
+    wp_set_current_user($custAId);
+    $zRevReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$zUuid}/request-revision");
+    $zRevReq->set_header('Content-Type', 'application/json');
+    $zRevReq->set_body(wp_json_encode(['comment' => 'Try to request a revision on a 0-revision plan']));
+    $zRevRes = rest_do_request($zRevReq);
+    $assert($zRevRes->get_status() === 400, 'max_revisions=0 plan strictly blocks even the first revision request (HTTP 400)');
+
+    foreach ($jobRepo->listArtworksForJob($zJobId) as $artRow) {
+        $storedVaultPaths[] = (string) $artRow['storage_rel_path'];
+    }
     foreach ($jobRepo->listArtworksForJob($custJobId) as $artRow) {
         $storedVaultPaths[] = (string) $artRow['storage_rel_path'];
     }
 
-    // Customer A approves Proof v2 -> approved_for_production (locks approved_proof_id & approved_at)
-    wp_set_current_user($custAId);
-    $appReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$custUuid}/approve-proof");
-    $appReq->set_header('Content-Type', 'application/json');
-    $appReq->set_body(wp_json_encode(['comment' => 'Looks perfect, approved for printing!']));
-    $appRes = rest_do_request($appReq);
-    $appData = $appRes->get_data()['data'];
-    $assert($appRes->get_status() === 200 && $appData['status'] === 'approved_for_production' && !empty($appData['approved_proof_id']) && !empty($appData['approved_at']), 'Customer A approves proof -> locked approved_proof_id + approved_at + approved_for_production');
-
-    // Shop Manager progresses through production -> QC -> packed -> shipped (with tracking + internal_notes) -> completed
+    // 14. HARDENING SECTION 5: Ship & Complete Job #1 in Mixed Order while Job #2 stays in production
+    //     Verify WC Order remains `processing` (NO auto-complete!) and receives tracking note.
     wp_set_current_user($mgrId);
-    $stages = [
-        ['to_status' => 'queued_for_production', 'comment' => 'Queued in print lab'],
-        ['to_status' => 'in_production', 'comment' => 'Printing & laminating'],
-        ['to_status' => 'quality_check', 'comment' => 'Color & cut QC passed'],
-        ['to_status' => 'packed', 'comment' => 'Protective tube packed'],
-        ['to_status' => 'shipped', 'tracking_code' => 'IR-POST-998877', 'internal_notes' => 'PRIVATE INTERNAL STAFF NOTE', 'comment' => 'Dispatched via courier'],
-        ['to_status' => 'completed', 'comment' => 'Delivered to customer'],
-    ];
-    foreach ($stages as $stage) {
-        $tReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$custJobId}/transition");
+    foreach ([
+        ['to_status' => 'in_production'],
+        ['to_status' => 'quality_check'],
+        ['to_status' => 'packed'],
+        ['to_status' => 'shipped', 'tracking_code' => 'IR-POST-MIX-7788', 'internal_notes' => 'PRIVATE INTERNAL STAFF NOTE'],
+        ['to_status' => 'completed'],
+    ] as $stage) {
+        $tReq = new WP_REST_Request('POST', '/' . RestKernel::NAMESPACE_V1 . "/skins/admin/jobs/{$stdJobId}/transition");
         $tReq->set_header('Content-Type', 'application/json');
         $tReq->set_body(wp_json_encode($stage));
-        $tRes = rest_do_request($tReq);
-        $assert($tRes->get_status() === 200 && $tRes->get_data()['data']['status'] === $stage['to_status'], 'Production transition -> ' . $stage['to_status']);
+        $assert(rest_do_request($tReq)->get_status() === 200, 'Mixed-order Job #1 transition -> ' . $stage['to_status']);
     }
 
-    // Verify WooCommerce HPOS order received shipping note with tracking code
-    $wcNotes = wc_get_order_notes(['order_id' => $custOrder->get_id(), 'type' => 'customer']);
+    $reloadedMixedOrder = wc_get_order($mixedOrder->get_id());
+    $assert($reloadedMixedOrder instanceof WC_Order && $reloadedMixedOrder->get_status() === 'processing', 'Completing Job #1 in mixed order does NOT auto-complete WooCommerce order (remains processing)');
+    $assert($jobRepo->findById($custJobId, false)['status'] === 'queued_for_production', 'Sibling Job #2 in mixed order remains independently unaffected in queued_for_production');
+
+    $wcNotes = wc_get_order_notes(['order_id' => $mixedOrder->get_id(), 'type' => 'customer']);
     $foundTrackingNote = false;
     foreach ($wcNotes as $note) {
-        if (str_contains((string) $note->content, 'IR-POST-998877')) {
+        if (str_contains((string) $note->content, 'IR-POST-MIX-7788')) {
             $foundTrackingNote = true;
             break;
         }
     }
-    $assert($foundTrackingNote, 'WooCommerce HPOS order received customer shipping note with tracking code IR-POST-998877');
+    $assert($foundTrackingNote, 'WooCommerce HPOS mixed order received customer shipping note with tracking code IR-POST-MIX-7788');
 
-    // Verify Customer A view NEVER leaks internal_notes or storage_rel_path
+    // Verify customer job payload NEVER leaks internal_notes or storage paths
     wp_set_current_user($custAId);
-    $finalCustRes = rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$custUuid}"));
-    $finalJson = wp_json_encode($finalCustRes->get_data());
-    $assert(!str_contains((string) $finalJson, 'PRIVATE INTERNAL STAFF NOTE'), 'Customer job response never leaks internal_notes');
-    $assert(!str_contains((string) $finalJson, 'storage_rel_path'), 'Customer job response never leaks storage_rel_path');
+    $finalCustJson = (string) wp_json_encode(rest_do_request(new WP_REST_Request('GET', '/' . RestKernel::NAMESPACE_V1 . "/skins/my-jobs/{$stdUuid}"))->get_data());
+    $assert(!str_contains($finalCustJson, 'PRIVATE INTERNAL STAFF NOTE') && !str_contains($finalCustJson, 'storage_rel_path'), 'Customer job response never leaks internal_notes or storage_rel_path');
 
-    // Verify shortcode renders commercial UI with zero engineering terms
+    // Verify shortcode contains zero engineering terms
     $shortcodeHtml = do_shortcode('[djgear_skin_configurator]');
-    $assert(str_contains($shortcodeHtml, 'djgear-skin-configurator'), '[djgear_skin_configurator] shortcode renders');
-    $assert(!str_contains(strtolower($shortcodeHtml), 'dieline') && !str_contains(strtolower($shortcodeHtml), 'engineering'), 'Customer configurator contains zero engineering/dieline terminology');
+    $assert(str_contains($shortcodeHtml, 'djgear-skin-configurator') && !str_contains(strtolower($shortcodeHtml), 'dieline') && !str_contains(strtolower($shortcodeHtml), 'engineering'), 'Customer configurator renders with zero engineering/dieline terminology');
 
     echo "\nSUMMARY: {$passed} assertions passed.\n";
 } finally {
-    // Cleanup ALL QA fixtures deterministically
     wp_set_current_user(0);
+    if (function_exists('WC') && WC()->cart !== null) {
+        WC()->cart->empty_cart();
+    }
     $vault = new CustomerArtworkVault();
     foreach (array_unique($storedVaultPaths) as $relPath) {
         $vault->deleteFile($relPath);

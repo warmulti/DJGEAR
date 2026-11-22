@@ -58,3 +58,21 @@ msgstr ""
 
 msgid "Authentication is required to access custom skin orders and artwork uploads."
 msgstr ""
+
+msgid "Each custom DJ skin configuration is produced individually (quantity must remain 1). Configure an additional skin to order more."
+msgstr ""
+
+msgid "Duplicate custom skin job detected in your cart. Please remove duplicates before checkout."
+msgstr ""
+
+msgid "Each custom skin item in your cart must have quantity 1."
+msgstr ""
+
+msgid "Please sign in before checking out with a custom DJ skin."
+msgstr ""
+
+msgid "Your DJGear Custom Skin (%1$s, ref %2$s) has shipped. Tracking code: %3$s"
+msgstr ""
+
+msgid "Your DJGear Custom Skin (%1$s, ref %2$s) has shipped."
+msgstr ""

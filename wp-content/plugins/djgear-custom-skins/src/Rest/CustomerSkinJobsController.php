@@ -26,11 +26,18 @@ use WP_REST_Server;
  * - Cross-customer access ALWAYS receives HTTP `403`.
  * - Artwork upload is blocked (HTTP `400`) on Standard plans where `allows_artwork_upload = false`.
  * - Private file downloads enforce owner OR `djgear_view_skin_orders`, `realpath()` containment,
- *   `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`.
+ *   `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`, and NEVER place any
+ *   server filesystem path or private storage path inside `WP_REST_Response::$data` (even on batch/internal REST).
  */
 final class CustomerSkinJobsController implements RouteInterface
 {
-    public const STREAM_HEADER_MARKER = 'X-DJGear-Stream-Path';
+    /**
+     * In-memory stream registry keyed strictly by `spl_object_id(WP_REST_Response)`.
+     * Never serialized into JSON, headers, logs, or batch REST responses.
+     *
+     * @var array<int, array{path: string, mime: string, filename: string, size: int}>
+     */
+    private array $pendingStreams = [];
 
     public function __construct(
         private readonly SkinJobRepository $jobs,
@@ -97,7 +104,6 @@ final class CustomerSkinJobsController implements RouteInterface
             'permission_callback' => [$this, 'requireAuthenticated'],
         ]);
 
-        // Stream binary bytes cleanly on real HTTP requests when a download response carries our internal marker.
         add_filter('rest_pre_serve_request', [$this, 'maybeStreamPrivateFile'], 10, 4);
     }
 
@@ -193,12 +199,13 @@ final class CustomerSkinJobsController implements RouteInterface
             $uuid = (string) $request->get_param('uuid');
             $body = $request->get_json_params();
             $artworkId = isset($body['artwork_id']) && is_numeric($body['artwork_id']) ? (int) $body['artwork_id'] : null;
+            $expectedSha256 = is_string($body['sha256_hash'] ?? null) ? $body['sha256_hash'] : null;
 
             if (!empty($body) && array_key_exists('acknowledged', $body) && !((bool) $body['acknowledged'])) {
                 return Response::error('djgear_skins_ack_false', 'Explicit acknowledgment must be true.', 400);
             }
 
-            $job = $this->orderService->acknowledgeLowDpi($uuid, get_current_user_id(), $artworkId);
+            $job = $this->orderService->acknowledgeLowDpi($uuid, get_current_user_id(), $artworkId, $expectedSha256);
             return Response::ok(PublicSkinsSerializer::customerJob($job));
         } catch (SkinValidationException $e) {
             return $this->toError($e);
@@ -230,15 +237,25 @@ final class CustomerSkinJobsController implements RouteInterface
                     wc_load_cart();
                 }
                 if ($wc->cart !== null) {
-                    $added = $wc->cart->add_to_cart(
-                        $productId,
-                        1,
-                        $variationId,
-                        [],
-                        [WooCommerceSkinBridge::CART_ITEM_KEY => $uuid]
-                    );
-                    if (is_string($added) && $added !== '') {
-                        $cartItemKey = $added;
+                    // Deduplicate: if this exact job UUID is already in cart, reuse its cart_item_key (qty stays 1).
+                    foreach ($wc->cart->get_cart() as $existingKey => $existingItem) {
+                        if (is_array($existingItem) && ($existingItem[WooCommerceSkinBridge::CART_ITEM_KEY] ?? null) === $uuid) {
+                            $cartItemKey = (string) $existingKey;
+                            break;
+                        }
+                    }
+
+                    if ($cartItemKey === null) {
+                        $added = $wc->cart->add_to_cart(
+                            $productId,
+                            1,
+                            $variationId,
+                            [],
+                            [WooCommerceSkinBridge::CART_ITEM_KEY => $uuid]
+                        );
+                        if (is_string($added) && $added !== '') {
+                            $cartItemKey = $added;
+                        }
                     }
                 }
             }
@@ -325,6 +342,7 @@ final class CustomerSkinJobsController implements RouteInterface
 
     /**
      * Private authenticated download proxy for customer artwork and designer proofs.
+     * NEVER exposes any server filesystem path or `storage_rel_path` in `WP_REST_Response::$data`.
      *
      * @param WP_REST_Request<array<string, mixed>> $request
      */
@@ -352,22 +370,30 @@ final class CustomerSkinJobsController implements RouteInterface
             }
 
             $safePath = $this->vault->resolveSafePath((string) $artwork['storage_rel_path']);
-            $filename = str_replace(['"', "\r", "\n"], '', (string) $artwork['original_filename']);
+            $filename = $this->sanitizeHeaderFilename((string) $artwork['original_filename']);
             $mime = (string) $artwork['mime_type'];
+            $sizeBytes = (int) $artwork['file_size_bytes'];
 
             $response = new WP_REST_Response([
-                'ok'           => true,
-                'filename'     => $filename,
-                'mime_type'    => $mime,
-                'size_bytes'   => (int) $artwork['file_size_bytes'],
-                'sha256_hash'  => (string) $artwork['sha256_hash'],
-                '_stream_path' => $safePath,
+                'ok'          => true,
+                'filename'    => $filename,
+                'mime_type'   => $mime,
+                'size_bytes'  => $sizeBytes,
+                'sha256_hash' => (string) $artwork['sha256_hash'],
             ], 200);
 
             $response->header('Content-Type', $mime);
-            $response->header('Content-Disposition', sprintf('attachment; filename="%s"', $filename));
+            $response->header('Content-Disposition', $this->buildContentDispositionHeader($filename));
             $response->header('X-Content-Type-Options', 'nosniff');
             $response->header('Cache-Control', 'private, no-store, max-age=0');
+
+            // Keep server path strictly in private memory — NEVER in WP_REST_Response::$data
+            $this->pendingStreams[spl_object_id($response)] = [
+                'path'     => $safePath,
+                'mime'     => $mime,
+                'filename' => $filename,
+                'size'     => $sizeBytes,
+            ];
 
             return $response;
         } catch (SkinValidationException $e) {
@@ -386,26 +412,26 @@ final class CustomerSkinJobsController implements RouteInterface
         WP_REST_Request $request,
         WP_REST_Server $server,
     ): bool {
-        if ($served || !str_contains($request->get_route(), '/skins/jobs/') || !str_ends_with($request->get_route(), '/download')) {
+        if ($served || $result->get_status() !== 200) {
             return $served;
         }
 
-        $data = $result->get_data();
-        if (!is_array($data) || empty($data['_stream_path']) || !is_string($data['_stream_path'])) {
+        $objectId = spl_object_id($result);
+        if (!isset($this->pendingStreams[$objectId])) {
             return $served;
         }
 
-        $path = $data['_stream_path'];
+        $stream = $this->pendingStreams[$objectId];
+        unset($this->pendingStreams[$objectId]);
+
+        $path = $stream['path'];
         if (!is_file($path) || !is_readable($path)) {
             return $served;
         }
 
-        $mime = is_string($data['mime_type'] ?? null) ? $data['mime_type'] : 'application/octet-stream';
-        $filename = is_string($data['filename'] ?? null) ? $data['filename'] : 'artwork';
-
         if (!headers_sent()) {
-            header('Content-Type: ' . $mime);
-            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Content-Type: ' . $stream['mime']);
+            header('Content-Disposition: ' . $this->buildContentDispositionHeader($stream['filename']));
             header('Content-Length: ' . (string) filesize($path));
             header('X-Content-Type-Options: nosniff');
             header('Cache-Control: private, no-store, max-age=0');
@@ -413,6 +439,25 @@ final class CustomerSkinJobsController implements RouteInterface
 
         readfile($path);
         return true;
+    }
+
+    private function sanitizeHeaderFilename(string $filename): string
+    {
+        $clean = str_replace(["\r", "\n", "\0", '"', '/', '\\'], '', $filename);
+        $clean = trim($clean);
+        return $clean !== '' ? mb_substr($clean, 0, 180) : 'artwork';
+    }
+
+    private function buildContentDispositionHeader(string $filename): string
+    {
+        $asciiFallback = (string) preg_replace('/[^A-Za-z0-9\.\-_ ]+/', '_', $filename);
+        $asciiFallback = trim($asciiFallback) !== '' ? $asciiFallback : 'artwork';
+
+        return sprintf(
+            'attachment; filename="%s"; filename*=UTF-8\'\'%s',
+            $asciiFallback,
+            rawurlencode($filename)
+        );
     }
 
     private function toError(SkinValidationException $e): WP_Error
