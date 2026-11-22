@@ -8,6 +8,11 @@ if (!class_exists('wpdb', false)) {
     class wpdb
     {
         public string $prefix = 'wp_';
+
+        public function query(string $query): int|bool
+        {
+            return true;
+        }
     }
 }
 

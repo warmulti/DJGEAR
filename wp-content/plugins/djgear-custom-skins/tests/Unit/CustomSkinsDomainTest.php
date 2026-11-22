@@ -8,6 +8,7 @@ use DJGear\CustomSkins\Domain\SkinJobStateMachine;
 use DJGear\CustomSkins\Domain\SkinValidationException;
 use DJGear\CustomSkins\Domain\SkinValidator;
 use DJGear\CustomSkins\Lifecycle\SkinMigrationRunner;
+use DJGear\CustomSkins\Repositories\SkinJobRepository;
 use DJGear\CustomSkins\Security\PublicSkinsSerializer;
 use DJGear\CustomSkins\Security\SkinCapabilities;
 use DJGear\CustomSkins\Services\ArtworkDpiValidator;
@@ -359,5 +360,77 @@ final class CustomSkinsDomainTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $runner->rollbackLast('WRONG_TOKEN');
+    }
+
+    public function testTransactionAfterRollbackExecutesStrictlyAfterRollbackAndDiscardsOnCommit(): void
+    {
+        $timeline = [];
+        $wpdb = new class ($timeline) extends \wpdb {
+            /** @var list<string> */
+            public array $timeline;
+
+            /**
+             * @param list<string> $timeline
+             */
+            public function __construct(array &$timeline)
+            {
+                $this->timeline = &$timeline;
+            }
+
+            public function query(string $query): int|bool
+            {
+                $this->timeline[] = 'SQL:' . $query;
+                return true;
+            }
+        };
+
+        $repo = new SkinJobRepository($wpdb);
+
+        // 1. Nested transaction throwing 409 Conflict runs afterRollback strictly AFTER outer ROLLBACK
+        $caughtStatus = null;
+        try {
+            $repo->transaction(static function () use ($repo, &$timeline): void {
+                $repo->transaction(static function () use ($repo, &$timeline): void {
+                    $timeline[] = 'INNER_WORK';
+                    $repo->afterRollback(static function () use (&$timeline): void {
+                        $timeline[] = 'AFTER_ROLLBACK_AUDIT';
+                    });
+                    $repo->afterRollback(static function (): void {
+                        throw new \RuntimeException('Secondary hook failure must not mask primary 409');
+                    });
+                    throw SkinValidationException::conflict('approved_proof_id', 'Tampered proof');
+                });
+            });
+        } catch (SkinValidationException $e) {
+            $caughtStatus = $e->statusCode;
+        }
+
+        self::assertSame(409, $caughtStatus, 'Primary 409 conflict exception must propagate unmasked.');
+        self::assertSame(
+            ['SQL:START TRANSACTION', 'INNER_WORK', 'SQL:ROLLBACK', 'AFTER_ROLLBACK_AUDIT'],
+            $timeline,
+            'afterRollback callback must execute strictly after SQL ROLLBACK completes.'
+        );
+
+        // 2. Committed transaction discards any queued afterRollback callbacks
+        $timeline = [];
+        $commitCallbackRan = false;
+        $result = $repo->transaction(static function () use ($repo, &$commitCallbackRan): string {
+            $repo->afterRollback(static function () use (&$commitCallbackRan): void {
+                $commitCallbackRan = true;
+            });
+            return 'ok';
+        });
+
+        self::assertSame('ok', $result);
+        self::assertFalse($commitCallbackRan, 'afterRollback callback must NOT run when transaction commits.');
+        self::assertSame(['SQL:START TRANSACTION', 'SQL:COMMIT'], $timeline);
+
+        // 3. Outside a transaction, afterRollback executes immediately
+        $immediateRan = false;
+        $repo->afterRollback(static function () use (&$immediateRan): void {
+            $immediateRan = true;
+        });
+        self::assertTrue($immediateRan, 'afterRollback outside an active transaction must execute immediately.');
     }
 }

@@ -876,13 +876,16 @@ final class SkinOrderService
         try {
             $safePath = $this->vault->resolveSafePath((string) $proof['storage_rel_path']);
         } catch (SkinValidationException) {
-            $this->audit->record(new AuditEvent(
-                action: 'skins.proof.integrity_failed',
-                resourceType: 'skin_job',
-                resourceId: $jobUuid,
-                actorId: $actorUserId,
-                context: ['proof_id' => $proofId, 'reason' => 'missing_or_inaccessible_file'],
-            ));
+            $this->jobs->afterRollback(function () use ($jobUuid, $actorUserId, $proofId): void {
+                $this->recordProofIntegrityFailure(
+                    $jobUuid,
+                    $actorUserId,
+                    $proofId,
+                    'missing_or_inaccessible_file',
+                    null,
+                    null
+                );
+            });
             throw SkinValidationException::conflict(
                 'approved_proof_id',
                 'Approved proof file is missing or inaccessible in private storage. Production is blocked until re-verified.'
@@ -893,18 +896,17 @@ final class SkinOrderService
         $expectedHash = (string) $proof['sha256_hash'];
 
         if (!is_string($diskHash) || $expectedHash === '' || !hash_equals($expectedHash, $diskHash)) {
-            $this->audit->record(new AuditEvent(
-                action: 'skins.proof.integrity_failed',
-                resourceType: 'skin_job',
-                resourceId: $jobUuid,
-                actorId: $actorUserId,
-                context: [
-                    'proof_id'      => $proofId,
-                    'reason'        => 'sha256_mismatch',
-                    'expected_hash' => $expectedHash,
-                    'actual_hash'   => is_string($diskHash) ? $diskHash : null,
-                ],
-            ));
+            $actualHash = is_string($diskHash) ? $diskHash : null;
+            $this->jobs->afterRollback(function () use ($jobUuid, $actorUserId, $proofId, $expectedHash, $actualHash): void {
+                $this->recordProofIntegrityFailure(
+                    $jobUuid,
+                    $actorUserId,
+                    $proofId,
+                    'sha256_mismatch',
+                    $expectedHash,
+                    $actualHash
+                );
+            });
             throw SkinValidationException::conflict(
                 'approved_proof_id',
                 'Approved proof SHA-256 integrity check failed (file modified or corrupted on disk). Production is blocked.'
@@ -912,6 +914,52 @@ final class SkinOrderService
         }
 
         return $proof;
+    }
+
+    /**
+     * Persist `skins.proof.integrity_failed` strictly outside rolled-back transactions,
+     * with short-window deduplication so rapid retries do not flood `djgear_audit_logs`.
+     */
+    private function recordProofIntegrityFailure(
+        string $jobUuid,
+        int $actorUserId,
+        int $proofId,
+        string $reason,
+        ?string $expectedHash,
+        ?string $actualHash,
+    ): void {
+        $dedupKey = 'proof_int_fail:' . hash('sha256', implode('|', [
+            $jobUuid,
+            (string) $proofId,
+            $reason,
+            (string) ($actualHash ?? 'none'),
+        ]));
+
+        if (function_exists('wp_cache_get') && function_exists('wp_cache_set')) {
+            if (wp_cache_get($dedupKey, 'djgear_skins_audit_dedup') !== false) {
+                return;
+            }
+            wp_cache_set($dedupKey, 1, 'djgear_skins_audit_dedup', 60);
+        }
+
+        $context = [
+            'proof_id' => $proofId,
+            'reason'   => $reason,
+        ];
+        if ($expectedHash !== null) {
+            $context['expected_hash'] = $expectedHash;
+        }
+        if ($actualHash !== null || $reason === 'sha256_mismatch') {
+            $context['actual_hash'] = $actualHash;
+        }
+
+        $this->audit->record(new AuditEvent(
+            action: 'skins.proof.integrity_failed',
+            resourceType: 'skin_job',
+            resourceId: $jobUuid,
+            actorId: $actorUserId,
+            context: $context,
+        ));
     }
 
     /**

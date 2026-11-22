@@ -25,6 +25,9 @@ final class SkinJobRepository
 
     private int $transactionDepth = 0;
 
+    /** @var list<callable(): void> Callbacks executed strictly after an outer transaction ROLLBACK */
+    private array $postRollbackCallbacks = [];
+
     public function __construct(
         private readonly wpdb $wpdb,
     ) {
@@ -46,6 +49,22 @@ final class SkinJobRepository
     }
 
     /**
+     * Register a callback to execute strictly AFTER the active outer transaction rolls back
+     * (or immediately if no transaction is active). Discarded if the transaction commits.
+     *
+     * @param callable(): void $callback
+     */
+    public function afterRollback(callable $callback): void
+    {
+        if ($this->transactionDepth > 0) {
+            $this->postRollbackCallbacks[] = $callback;
+            return;
+        }
+
+        $callback();
+    }
+
+    /**
      * Execute a callback inside an InnoDB transaction (reentrant when already inside a transaction).
      *
      * @template T
@@ -56,6 +75,7 @@ final class SkinJobRepository
     {
         $isOuter = ($this->transactionDepth === 0);
         if ($isOuter) {
+            $this->postRollbackCallbacks = [];
             $this->wpdb->query('START TRANSACTION');
         }
         $this->transactionDepth++;
@@ -65,14 +85,33 @@ final class SkinJobRepository
             $this->transactionDepth--;
             if ($isOuter) {
                 $this->wpdb->query('COMMIT');
+                $this->postRollbackCallbacks = [];
             }
             return $result;
         } catch (\Throwable $e) {
             $this->transactionDepth = max(0, $this->transactionDepth - 1);
             if ($isOuter) {
                 $this->wpdb->query('ROLLBACK');
+                $this->drainPostRollbackCallbacks();
             }
             throw $e;
+        }
+    }
+
+    /**
+     * Execute and clear all callbacks registered during a rolled-back transaction.
+     */
+    private function drainPostRollbackCallbacks(): void
+    {
+        $callbacks = $this->postRollbackCallbacks;
+        $this->postRollbackCallbacks = [];
+
+        foreach ($callbacks as $rollbackCallback) {
+            try {
+                $rollbackCallback();
+            } catch (\Throwable) {
+                // Never allow a post-rollback hook (e.g. audit logging) to mask the primary exception.
+            }
         }
     }
 

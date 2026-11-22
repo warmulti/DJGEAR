@@ -73,6 +73,7 @@ $createdBrandId = null;
 $createdCategoryId = null;
 $tempFiles = [];
 $storedVaultPaths = [];
+$createdJobUuids = [];
 
 try {
     // 1. Module registration & dependency resolution
@@ -642,7 +643,29 @@ try {
     $dupAppRes = rest_do_request($appReq);
     $assert($dupAppRes->get_status() === 400 && count($jobRepo->listHistoryForJob($custJobId)) === $histCountAfterApprove, 'Repeated proof approval blocked cleanly with zero duplicate history rows');
 
-    // 13c. HARDENING SECTION 2.7: Tamper with approved proof file on disk -> transition to production MUST FAIL 409!
+    // 13c. HARDENING SECTION 2.7 + FINAL AUDIT-LOG PERSISTENCE FIX:
+    //      Verify modified AND missing approved proof files block production (HTTP 409),
+    //      roll back the transaction cleanly, AND persist `skins.proof.integrity_failed`
+    //      outside the rolled-back InnoDB transaction with retry deduplication.
+    $createdJobUuids[] = $custUuid;
+    $auditTable = $wpdb->prefix . 'djgear_audit_logs';
+    $fetchIntegrityAuditRows = static function (string $jobUuid) use ($wpdb, $auditTable): array {
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, action, resource_type, resource_id, actor_id, context_json
+                 FROM {$auditTable}
+                 WHERE action = %s AND resource_id = %s
+                 ORDER BY id ASC",
+                'skins.proof.integrity_failed',
+                $jobUuid
+            ),
+            ARRAY_A
+        );
+        return is_array($rows) ? $rows : [];
+    };
+
+    $assert(count($fetchIntegrityAuditRows($custUuid)) === 0, 'Zero proof integrity failure audit rows exist prior to tampering');
+
     $approvedProofId = (int) $jobRepo->findById($custJobId, false)['approved_proof_id'];
     $approvedProofRow = $jobRepo->findArtworkById($approvedProofId);
     $approvedDiskPath = $vault->resolveSafePath((string) $approvedProofRow['storage_rel_path']);
@@ -655,10 +678,72 @@ try {
     $tamperQueueReq->set_body(wp_json_encode(['to_status' => 'queued_for_production']));
     $tamperQueueRes = rest_do_request($tamperQueueReq);
     $assert($tamperQueueRes->get_status() === 409, 'Modified approved proof file on disk BLOCKS transition to production (HTTP 409 SHA-256 mismatch)');
+    $assert(
+        $jobRepo->findById($custJobId, false)['status'] === 'approved_for_production'
+        && count($jobRepo->listHistoryForJob($custJobId)) === $histCountAfterApprove,
+        'Tampered proof failure rolls back status transition completely (job remains approved_for_production)'
+    );
 
-    // Restore original proof bytes -> production entry succeeds!
+    $tamperAuditRows = $fetchIntegrityAuditRows($custUuid);
+    $tamperCtx = count($tamperAuditRows) === 1 ? json_decode((string) $tamperAuditRows[0]['context_json'], true) : null;
+    $assert(
+        count($tamperAuditRows) === 1
+        && is_array($tamperCtx)
+        && ($tamperCtx['reason'] ?? '') === 'sha256_mismatch'
+        && (int) ($tamperCtx['proof_id'] ?? 0) === $approvedProofId
+        && !empty($tamperCtx['expected_hash'])
+        && !empty($tamperCtx['actual_hash'])
+        && $tamperCtx['expected_hash'] !== $tamperCtx['actual_hash'],
+        'Modified approved proof persists skins.proof.integrity_failed (sha256_mismatch) in djgear_audit_logs after transaction rollback'
+    );
+
+    // Immediate retry must still return HTTP 409 without duplicating the audit log row
+    $tamperRetryRes = rest_do_request($tamperQueueReq);
+    $assert(
+        $tamperRetryRes->get_status() === 409 && count($fetchIntegrityAuditRows($custUuid)) === 1,
+        'Repeated tampered proof retry returns HTTP 409 and deduplicates skins.proof.integrity_failed audit log'
+    );
+
+    // Missing approved proof file scenario: move file away, assert 409 + rollback + persisted audit log + dedup
+    $missingBackupPath = $approvedDiskPath . '.qa_missing_bak';
+    $assert(rename($approvedDiskPath, $missingBackupPath), 'Temporarily moved approved proof file to simulate missing file');
+    try {
+        $missingRes = rest_do_request($tamperQueueReq);
+        $assert($missingRes->get_status() === 409, 'Missing approved proof file on disk BLOCKS transition to production (HTTP 409)');
+        $assert(
+            $jobRepo->findById($custJobId, false)['status'] === 'approved_for_production'
+            && count($jobRepo->listHistoryForJob($custJobId)) === $histCountAfterApprove,
+            'Missing proof failure rolls back status transition completely (job remains approved_for_production)'
+        );
+
+        $missingAuditRows = $fetchIntegrityAuditRows($custUuid);
+        $missingCtx = count($missingAuditRows) === 2 ? json_decode((string) $missingAuditRows[1]['context_json'], true) : null;
+        $assert(
+            count($missingAuditRows) === 2
+            && is_array($missingCtx)
+            && ($missingCtx['reason'] ?? '') === 'missing_or_inaccessible_file'
+            && (int) ($missingCtx['proof_id'] ?? 0) === $approvedProofId,
+            'Missing approved proof persists skins.proof.integrity_failed (missing_or_inaccessible_file) in djgear_audit_logs after transaction rollback'
+        );
+
+        $missingRetryRes = rest_do_request($tamperQueueReq);
+        $assert(
+            $missingRetryRes->get_status() === 409 && count($fetchIntegrityAuditRows($custUuid)) === 2,
+            'Repeated missing proof retry returns HTTP 409 and deduplicates skins.proof.integrity_failed audit log'
+        );
+    } finally {
+        if (is_file($missingBackupPath)) {
+            rename($missingBackupPath, $approvedDiskPath);
+        }
+    }
+
+    // Restore original proof bytes -> production entry succeeds with ZERO additional integrity failure audit events!
     file_put_contents($approvedDiskPath, $originalProofBytes);
     $assert(rest_do_request($tamperQueueReq)->get_status() === 200, 'Restored intact approved proof passes live SHA-256 re-verification -> queued_for_production');
+    $assert(
+        count($fetchIntegrityAuditRows($custUuid)) === 2,
+        'Successful proof integrity verification generates ZERO additional skins.proof.integrity_failed audit rows'
+    );
 
     // 13d. Concurrency CAS check: stale expectedFromStatus throws 409 Conflict
     $casConflict = false;
@@ -768,6 +853,10 @@ try {
         $jobRepo = $core->container()->get(SkinJobRepository::class);
         foreach ($createdJobs as $jid) {
             $jobRepo->purgeJob($jid);
+        }
+        $auditCleanupTable = $wpdb->prefix . 'djgear_audit_logs';
+        foreach (array_unique($createdJobUuids) as $cleanupUuid) {
+            $wpdb->delete($auditCleanupTable, ['resource_id' => $cleanupUuid], ['%s']);
         }
         /** @var SkinVariantRepository $variantRepo */
         $variantRepo = $core->container()->get(SkinVariantRepository::class);
