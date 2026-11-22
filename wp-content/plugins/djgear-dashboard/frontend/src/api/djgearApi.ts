@@ -1,6 +1,13 @@
 import type {
   ApiEnvelope,
   AuditLogItem,
+  CatalogBrand,
+  CatalogCategory,
+  CatalogCompatibility,
+  CatalogDevice,
+  CatalogImportValidation,
+  CatalogSkinDefinition,
+  CatalogSpec,
   CustomerItem,
   DjgearSettings,
   HealthData,
@@ -73,5 +80,91 @@ export class DjgearApi {
 
   public switchUserLocale(locale: LocaleCode): Promise<ApiEnvelope<{ i18n: I18nMetadata }>> {
     return this.client.post<{ i18n: I18nMetadata }>('djgear/v1/dashboard/preferences/locale', { locale });
+  }
+
+  // --- Phase 3: Device Catalog API (djgear-device-catalog) ---
+  public listCatalogBrands(): Promise<ApiEnvelope<{ items: CatalogBrand[] }>> {
+    return this.client.get<{ items: CatalogBrand[] }>('djgear/v1/catalog/brands');
+  }
+
+  public createCatalogBrand(payload: Record<string, unknown>): Promise<ApiEnvelope<{ brand: CatalogBrand }>> {
+    return this.client.post<{ brand: CatalogBrand }>('djgear/v1/catalog/brands', payload);
+  }
+
+  public deleteCatalogBrand(id: number): Promise<ApiEnvelope<{ deleted: boolean }>> {
+    return this.client.delete<{ deleted: boolean }>(`djgear/v1/catalog/brands/${id}`);
+  }
+
+  public listCatalogCategories(): Promise<ApiEnvelope<{ items: CatalogCategory[] }>> {
+    return this.client.get<{ items: CatalogCategory[] }>('djgear/v1/catalog/categories');
+  }
+
+  public createCatalogCategory(payload: Record<string, unknown>): Promise<ApiEnvelope<{ category: CatalogCategory }>> {
+    return this.client.post<{ category: CatalogCategory }>('djgear/v1/catalog/categories', payload);
+  }
+
+  public deleteCatalogCategory(id: number): Promise<ApiEnvelope<{ deleted: boolean }>> {
+    return this.client.delete<{ deleted: boolean }>(`djgear/v1/catalog/categories/${id}`);
+  }
+
+  public listCatalogDevices(params?: {
+    q?: string;
+    brand?: string | number;
+    category?: string | number;
+    status?: string;
+    skin_ready?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ApiEnvelope<{ items: CatalogDevice[] }>> {
+    return this.client.get<{ items: CatalogDevice[] }>('djgear/v1/catalog/devices', params);
+  }
+
+  public getCatalogDevice(id: number): Promise<
+    ApiEnvelope<{
+      device: CatalogDevice;
+      specs: CatalogSpec[];
+      compatibilities: CatalogCompatibility[];
+      skins: CatalogSkinDefinition[];
+    }>
+  > {
+    return this.client.get(`djgear/v1/catalog/devices/${id}`);
+  }
+
+  public createCatalogDevice(payload: Record<string, unknown>): Promise<ApiEnvelope<{ device: CatalogDevice }>> {
+    return this.client.post<{ device: CatalogDevice }>('djgear/v1/catalog/devices', payload);
+  }
+
+  public deleteCatalogDevice(id: number): Promise<ApiEnvelope<{ deleted: boolean }>> {
+    return this.client.delete<{ deleted: boolean }>(`djgear/v1/catalog/devices/${id}`);
+  }
+
+  public replaceCatalogSpecs(id: number, specs: CatalogSpec[]): Promise<ApiEnvelope<{ specs: CatalogSpec[] }>> {
+    return this.client.put<{ specs: CatalogSpec[] }>(`djgear/v1/catalog/devices/${id}/specs`, { specs });
+  }
+
+  public listCatalogSkins(status?: string): Promise<ApiEnvelope<{ items: CatalogSkinDefinition[] }>> {
+    return this.client.get<{ items: CatalogSkinDefinition[] }>('djgear/v1/catalog/skins', { status });
+  }
+
+  public createCatalogSkin(payload: Record<string, unknown>): Promise<ApiEnvelope<{ skin: CatalogSkinDefinition }>> {
+    return this.client.post<{ skin: CatalogSkinDefinition }>('djgear/v1/catalog/skins', payload);
+  }
+
+  public deleteCatalogSkin(id: number): Promise<ApiEnvelope<{ deleted: boolean }>> {
+    return this.client.delete<{ deleted: boolean }>(`djgear/v1/catalog/skins/${id}`);
+  }
+
+  public validateCatalogImport(payload: Record<string, unknown>): Promise<ApiEnvelope<CatalogImportValidation>> {
+    return this.client.post<CatalogImportValidation>('djgear/v1/catalog/import/validate', payload);
+  }
+
+  public executeCatalogImport(
+    payload: Record<string, unknown>
+  ): Promise<ApiEnvelope<{ created: number; updated: number; skipped: number; errors: Array<{ index: number; message: string }> }>> {
+    return this.client.post('djgear/v1/catalog/import/execute', payload);
+  }
+
+  public exportCatalog(format: 'json' | 'csv'): Promise<ApiEnvelope<{ format: string; payload?: unknown; content?: string }>> {
+    return this.client.get('djgear/v1/catalog/export', { format });
   }
 }

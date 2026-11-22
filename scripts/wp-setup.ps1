@@ -106,6 +106,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 Invoke-WpCli @('plugin', 'activate', 'djgear-dashboard')
 
+Write-Host "==> Installing DJGear Device Catalog Composer autoloader and activating djgear-device-catalog..." -ForegroundColor Cyan
+& docker compose exec -T -w /var/www/html/wp-content/plugins/djgear-device-catalog wordpress composer install --no-interaction --prefer-dist
+if ($LASTEXITCODE -ne 0) {
+    throw "Composer install failed for djgear-device-catalog."
+}
+Invoke-WpCli @('plugin', 'activate', 'djgear-device-catalog')
+
 Write-Host "==> Verifying active plugins & Redis status..." -ForegroundColor Cyan
 Invoke-WpCli @('plugin', 'list')
 Invoke-WpCli @('redis', 'status')
