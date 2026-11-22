@@ -1,0 +1,171 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: DJGear Theme 0.1.0\n"
+"Language: fa_IR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n==0 || n==1);\n"
+"X-Domain: djgear-theme\n"
+
+msgid "Skip to main content"
+msgstr "پرش به محتوای اصلی"
+
+msgid "Primary Header Navigation"
+msgstr "منوی اصلی هدر"
+
+msgid "Mobile Drawer Navigation"
+msgstr "منوی کشویی موبایل"
+
+msgid "Footer — Shop & Gear"
+msgstr "فوتر — فروشگاه و تجهیزات"
+
+msgid "Footer — Customer Support"
+msgstr "فوتر — پشتیبانی مشتریان"
+
+msgid "Footer — Legal & Policies"
+msgstr "فوتر — قوانین و مقررات"
+
+msgid "Home"
+msgstr "صفحه اصلی"
+
+msgid "Shop"
+msgstr "فروشگاه"
+
+msgid "My Account"
+msgstr "حساب کاربری"
+
+msgid "Primary Navigation"
+msgstr "ناوبری اصلی"
+
+msgid "Mobile Navigation"
+msgstr "ناوبری موبایل"
+
+msgid "Navigation"
+msgstr "منو"
+
+msgid "Open navigation menu"
+msgstr "باز کردن منوی ناوبری"
+
+msgid "Close navigation menu"
+msgstr "بستن منوی ناوبری"
+
+msgid "Open product search"
+msgstr "باز کردن جستجوی محصولات"
+
+msgid "Close search"
+msgstr "بستن جستجو"
+
+msgid "Open shopping cart"
+msgstr "باز کردن سبد خرید"
+
+msgid "Close shopping cart"
+msgstr "بستن سبد خرید"
+
+msgid "Pro DJ Gear & Custom Skins"
+msgstr "تجهیزات حرفه‌ای دی‌جی و اسکین اختصاصی"
+
+msgid "Pro DJ Equipment & Custom Skins"
+msgstr "تجهیزات حرفه‌ای دی‌جی و اسکین اختصاصی"
+
+msgid "Search Equipment & Skins"
+msgstr "جستجوی تجهیزات و اسکین"
+
+msgid "Search for DJ controllers, mixers, headphones, or skins"
+msgstr "جستجوی کنترلر دی‌جی، میکسر، هدفون یا اسکین"
+
+msgid "Search CDJ, DDJ-FLX4, mixers, skins..."
+msgstr "جستجوی CDJ، DDJ-FLX4، میکسر، اسکین..."
+
+msgid "Search"
+msgstr "جستجو"
+
+msgid "Shopping Cart"
+msgstr "سبد خرید"
+
+msgid "View Cart"
+msgstr "مشاهده سبد خرید"
+
+msgid "Checkout"
+msgstr "تسویه حساب"
+
+msgid "Breadcrumb"
+msgstr "مسیر صفحه"
+
+msgid "Previous"
+msgstr "قبلی"
+
+msgid "Next"
+msgstr "بعدی"
+
+msgid "Posts navigation"
+msgstr "ناوبری نوشته‌ها"
+
+msgid "Nothing found"
+msgstr "موردی یافت نشد"
+
+msgid "No items match your request right now."
+msgstr "در حال حاضر موردی مطابق با درخواست شما یافت نشد."
+
+msgid "Pages:"
+msgstr "صفحات:"
+
+msgid "No items found in this archive."
+msgstr "موردی در این آرشیو یافت نشد."
+
+msgid "Search: %s"
+msgstr "جستجو: %s"
+
+msgid "Search results for \"%s\""
+msgstr "نتایج جستجو برای «%s»"
+
+msgid "No matching products or pages were found. Try a different model code or keyword."
+msgstr "محصول یا صفحه‌ای با این عبارت یافت نشد. کد مدل یا کلیدواژه دیگری را امتحان کنید."
+
+msgid "Page Not Found"
+msgstr "صفحه یافت نشد"
+
+msgid "Page not found"
+msgstr "صفحه مورد نظر یافت نشد"
+
+msgid "The page or gear you are looking for may have moved or no longer exists."
+msgstr "صفحه یا محصول مورد نظر شما ممکن است جابه‌جا یا حذف شده باشد."
+
+msgid "Back to Home"
+msgstr "بازگشت به صفحه اصلی"
+
+msgid "Browse Shop"
+msgstr "مشاهده فروشگاه"
+
+msgid "Authentic professional DJ hardware, studio essentials, and precision custom equipment skins backed by transparent order tracking."
+msgstr "تجهیزات اصل و حرفه‌ای دی‌جی، لوازم استودیویی و اسکین‌های اختصاصی دستگاه با پیگیری شفاف سفارش."
+
+msgid "Store Guarantees"
+msgstr "ضمانت‌های فروشگاه"
+
+msgid "Verified Original Gear"
+msgstr "تضمین اصالت تجهیزات"
+
+msgid "Tracked Nationwide Delivery"
+msgstr "ارسال سراسری با کد رهگیری"
+
+msgid "Shop & Gear"
+msgstr "فروشگاه و تجهیزات"
+
+msgid "All Products"
+msgstr "همه محصولات"
+
+msgid "Customer Care"
+msgstr "خدمات مشتریان"
+
+msgid "My Account & Orders"
+msgstr "حساب کاربری و سفارش‌ها"
+
+msgid "Policies"
+msgstr "قوانین و حریم خصوصی"
+
+msgid "Privacy Policy"
+msgstr "حریم خصوصی"
+
+msgid "© %1$s %2$s. All rights reserved."
+msgstr "© %1$s %2$s. تمامی حقوق محفوظ است."

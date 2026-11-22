@@ -1,0 +1,80 @@
+/* WooCommerce 11.3 Cart & Checkout Blocks — Premium Dark Surface Integration */
+
+.wp-block-woocommerce-cart,
+.wp-block-woocommerce-checkout,
+.wc-block-cart,
+.wc-block-checkout {
+  color: var(--djg-text-secondary);
+}
+
+.wc-block-components-sidebar,
+.wc-block-cart__totals-title,
+.wc-block-checkout__sidebar,
+.wc-block-components-order-summary,
+.wc-block-components-totals-wrapper,
+.wc-block-cart-items,
+.wc-block-components-radio-control,
+.wc-block-components-panel {
+  border-color: var(--djg-border-subtle) !important;
+}
+
+.wp-block-woocommerce-cart-totals-block,
+.wp-block-woocommerce-checkout-totals-block,
+.wc-block-cart-items {
+  background-color: var(--djg-bg-surface-1);
+  border: 1px solid var(--djg-border-subtle);
+  border-radius: var(--djg-radius-lg);
+  padding: var(--djg-space-5);
+}
+
+.wc-block-components-text-input input[type='text'],
+.wc-block-components-text-input input[type='email'],
+.wc-block-components-text-input input[type='tel'],
+.wc-block-components-text-input input[type='password'],
+.wc-block-components-text-input input[type='url'],
+.wc-block-components-combobox .wc-block-components-combobox-control input.components-combobox-control__input,
+.wc-block-components-form .wc-block-components-textarea,
+.wc-block-components-quantity-selector {
+  background-color: var(--djg-bg-surface-2) !important;
+  border-color: var(--djg-border-default) !important;
+  color: var(--djg-text-primary) !important;
+  border-radius: var(--djg-radius-md) !important;
+}
+
+.wc-block-components-text-input label,
+.wc-block-components-combobox label,
+.wc-block-components-checkout-step__description,
+.wc-block-components-product-metadata {
+  color: var(--djg-text-muted) !important;
+}
+
+.wc-block-components-checkout-step__title,
+.wc-block-components-product-name,
+.wc-block-components-totals-item__value,
+.wc-block-components-totals-footer-item .wc-block-components-totals-item__label,
+.wc-block-components-totals-footer-item .wc-block-components-totals-item__value {
+  color: var(--djg-text-primary) !important;
+}
+
+.wc-block-components-button.contained,
+.wc-block-cart__submit-button,
+.wc-block-components-checkout-place-order-button {
+  background-color: var(--djg-accent-primary) !important;
+  color: #ffffff !important;
+  border-radius: var(--djg-radius-md) !important;
+  min-height: 46px;
+  font-weight: 600;
+}
+
+.wc-block-components-button.contained:hover,
+.wc-block-cart__submit-button:hover,
+.wc-block-components-checkout-place-order-button:hover {
+  background-color: var(--djg-accent-primary-hover) !important;
+}
+
+.wc-block-components-notice-banner {
+  background-color: var(--djg-bg-surface-2) !important;
+  border-color: var(--djg-border-default) !important;
+  color: var(--djg-text-primary) !important;
+  border-radius: var(--djg-radius-md) !important;
+}

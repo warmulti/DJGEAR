@@ -1,0 +1,42 @@
+/* Non-intrusive dark presentation styling for djgear-custom-skins storefront shells */
+
+.djgear-skin-configurator {
+  padding: var(--djg-space-6);
+  border-radius: var(--djg-radius-lg);
+  border: 1px solid var(--djg-border-subtle);
+  background-color: var(--djg-bg-surface-1);
+}
+
+.djgear-skin-configurator__header {
+  margin-block-end: var(--djg-space-6);
+  padding-block-end: var(--djg-space-5);
+  border-block-end: 1px solid var(--djg-border-subtle);
+}
+
+.djgear-skin-configurator__header h2 {
+  font-size: var(--djg-text-xl);
+  margin-block-end: var(--djg-space-2);
+}
+
+.djgear-skin-configurator__header p {
+  margin: 0;
+  color: var(--djg-text-muted);
+  font-size: var(--djg-text-sm);
+}
+
+.djgear-my-skins h3 {
+  font-size: var(--djg-text-xl);
+  margin-block-end: var(--djg-space-4);
+}
+
+.djgear-proof-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--djg-space-2);
+  padding: 2px var(--djg-space-2);
+  border-radius: var(--djg-radius-pill);
+  background-color: var(--djg-accent-warm-subtle);
+  color: var(--djg-status-warning);
+  font-size: var(--djg-text-xs);
+  font-weight: 600;
+}

@@ -1,0 +1,106 @@
+:root {
+  /* Core Canvas & Machined Dark Surfaces */
+  --djg-bg-canvas: #070b14;
+  --djg-bg-surface-1: #0d1322;
+  --djg-bg-surface-2: #131b2e;
+  --djg-bg-surface-3: #1a243c;
+  --djg-bg-media: #0b101d;
+  --djg-bg-header: rgba(7, 11, 20, 0.86);
+  --djg-bg-backdrop: rgba(3, 6, 14, 0.72);
+
+  /* Hairline Borders */
+  --djg-border-subtle: rgba(148, 163, 184, 0.12);
+  --djg-border-default: rgba(148, 163, 184, 0.22);
+  --djg-border-strong: rgba(226, 232, 240, 0.36);
+
+  /* Typography Colors (WCAG AA / AAA verified on #070B14 and #0D1322) */
+  --djg-text-primary: #f8fafc;
+  --djg-text-secondary: #cbd5e1;
+  --djg-text-muted: #94a3b8;
+
+  /* Restrained Studio Accents */
+  --djg-accent-primary: #3b82f6;
+  --djg-accent-primary-hover: #2563eb;
+  --djg-accent-subtle: rgba(59, 130, 246, 0.14);
+  --djg-accent-warm: #d97706;
+  --djg-accent-warm-subtle: rgba(217, 119, 6, 0.16);
+
+  /* Semantic Status */
+  --djg-status-success: #10b981;
+  --djg-status-success-subtle: rgba(16, 185, 129, 0.14);
+  --djg-status-warning: #f59e0b;
+  --djg-status-warning-subtle: rgba(245, 158, 11, 0.14);
+  --djg-status-danger: #ef4444;
+  --djg-status-danger-subtle: rgba(239, 68, 68, 0.14);
+
+  /* Typography Families (Self-hosted variable fonts via @fontsource-variable) */
+  --djg-font-sans-ltr: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --djg-font-sans-rtl: 'Vazirmatn Variable', 'Vazirmatn', 'Tahoma', system-ui, sans-serif;
+  --djg-font-sans: var(--djg-font-sans-ltr);
+  --djg-font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Fluid Type Scale */
+  --djg-text-xs: 0.75rem;
+  --djg-text-sm: 0.875rem;
+  --djg-text-base: 1rem;
+  --djg-text-lg: 1.125rem;
+  --djg-text-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --djg-text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2.25rem);
+  --djg-text-3xl: clamp(2rem, 1.6rem + 2vw, 3.25rem);
+
+  --djg-leading-body: 1.65;
+  --djg-leading-heading: 1.25;
+  --djg-tracking-heading: -0.02em;
+  --djg-tracking-eyebrow: 0.08em;
+
+  /* 4px Spacing Scale */
+  --djg-space-1: 0.25rem;
+  --djg-space-2: 0.5rem;
+  --djg-space-3: 0.75rem;
+  --djg-space-4: 1rem;
+  --djg-space-5: 1.25rem;
+  --djg-space-6: 1.5rem;
+  --djg-space-8: 2rem;
+  --djg-space-10: 2.5rem;
+  --djg-space-12: 3rem;
+  --djg-space-16: 4rem;
+  --djg-space-20: 5rem;
+
+  /* Layout & Chrome */
+  --djg-container-max: 1320px;
+  --djg-container-gutter: clamp(1rem, 3vw, 2rem);
+  --djg-header-height: 72px;
+
+  /* Radii */
+  --djg-radius-sm: 6px;
+  --djg-radius-md: 10px;
+  --djg-radius-lg: 14px;
+  --djg-radius-pill: 9999px;
+
+  /* Shadows */
+  --djg-shadow-sm: 0 2px 8px rgba(2, 6, 23, 0.35);
+  --djg-shadow-md: 0 10px 30px rgba(2, 6, 23, 0.48);
+  --djg-shadow-drawer: 0 20px 50px rgba(0, 0, 0, 0.65);
+
+  /* Motion */
+  --djg-ease: cubic-bezier(0.2, 0, 0, 1);
+  --djg-duration-fast: 160ms;
+  --djg-duration-base: 240ms;
+
+  /* Z-index layers */
+  --djg-z-header: 40;
+  --djg-z-drawer: 60;
+  --djg-z-overlay: 70;
+  --djg-z-skip: 100;
+
+  color-scheme: dark;
+}
+
+/* Persian / RTL typography refinements */
+html[dir='rtl'] {
+  --djg-font-sans: var(--djg-font-sans-rtl);
+  --djg-leading-body: 1.8;
+  --djg-leading-heading: 1.38;
+  --djg-tracking-heading: 0;
+  --djg-tracking-eyebrow: 0;
+}
