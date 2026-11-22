@@ -1,0 +1,12 @@
+parameters:
+  level: 6
+  paths:
+    - src
+    - djgear-custom-skins.php
+  scanDirectories:
+    - ../djgear-core/src
+    - ../djgear-device-catalog/src
+  scanFiles:
+    - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+  reportUnmatchedIgnoredErrors: false

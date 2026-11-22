@@ -7,8 +7,10 @@ export type RouteId =
   | 'customers'
   | 'catalog-devices'
   | 'catalog-taxonomies'
-  | 'catalog-skins'
   | 'catalog-import-export'
+  | 'skins-variants'
+  | 'skins-plans'
+  | 'skins-orders'
   | 'sms'
   | 'email'
   | 'forms'
@@ -19,7 +21,7 @@ export type RouteId =
   | 'modules'
   | 'settings';
 
-export type NavGroupId = 'core' | 'commerce' | 'catalog' | 'comms' | 'growth' | 'operations';
+export type NavGroupId = 'core' | 'commerce' | 'catalog' | 'custom-skins' | 'comms' | 'growth' | 'operations';
 
 export interface RouteDefinition {
   id: RouteId;
@@ -36,6 +38,7 @@ export const NAV_GROUPS: Array<{ id: NavGroupId; labelKey: TranslationKey }> = [
   { id: 'core', labelKey: 'navGroupCore' },
   { id: 'commerce', labelKey: 'navGroupCommerce' },
   { id: 'catalog', labelKey: 'navGroupCatalog' },
+  { id: 'custom-skins', labelKey: 'navGroupCustomSkins' },
   { id: 'comms', labelKey: 'navGroupComms' },
   { id: 'growth', labelKey: 'navGroupGrowth' },
   { id: 'operations', labelKey: 'navGroupOperations' },
@@ -91,20 +94,36 @@ export const ROUTES: RouteDefinition[] = [
     targetModuleId: 'djgear-device-catalog',
   },
   {
-    id: 'catalog-skins',
-    group: 'catalog',
-    labelKey: 'navCatalogSkins',
-    requiredCapability: 'djgear_manage_skin_definitions',
-    status: 'live',
-    targetModuleId: 'djgear-device-catalog',
-  },
-  {
     id: 'catalog-import-export',
     group: 'catalog',
     labelKey: 'navCatalogImportExport',
     requiredCapability: 'djgear_import_export_catalog',
     status: 'live',
     targetModuleId: 'djgear-device-catalog',
+  },
+  {
+    id: 'skins-variants',
+    group: 'custom-skins',
+    labelKey: 'navSkinVariants',
+    requiredCapability: 'djgear_manage_skin_catalog',
+    status: 'live',
+    targetModuleId: 'djgear-custom-skins',
+  },
+  {
+    id: 'skins-plans',
+    group: 'custom-skins',
+    labelKey: 'navSkinPlans',
+    requiredCapability: 'djgear_manage_skin_plans',
+    status: 'live',
+    targetModuleId: 'djgear-custom-skins',
+  },
+  {
+    id: 'skins-orders',
+    group: 'custom-skins',
+    labelKey: 'navSkinOrders',
+    requiredCapability: 'djgear_view_skin_orders',
+    status: 'live',
+    targetModuleId: 'djgear-custom-skins',
   },
   {
     id: 'sms',
