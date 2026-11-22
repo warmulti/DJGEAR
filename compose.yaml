@@ -123,6 +123,7 @@ services:
       - wp_uploads:/var/www/html/wp-content/uploads
       - ./wp-content/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
       - ./wp-content/plugins/djgear-core:/var/www/html/wp-content/plugins/djgear-core
+      - ./wp-content/plugins/djgear-dashboard:/var/www/html/wp-content/plugins/djgear-dashboard
     networks:
       - djgear_frontend
       - djgear_backend
@@ -146,6 +147,7 @@ services:
       - wp_core:/var/www/html:ro
       - wp_uploads:/var/www/html/wp-content/uploads:ro
       - ./wp-content/plugins/djgear-core:/var/www/html/wp-content/plugins/djgear-core:ro
+      - ./wp-content/plugins/djgear-dashboard:/var/www/html/wp-content/plugins/djgear-dashboard:ro
       - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
