@@ -29,6 +29,11 @@ final class WooCommerceSetup
         // Remove default sidebar on WooCommerce templates for clean full-width studio layout
         remove_action('woocommerce_sidebar', 'woocommerce_get_sidebar', 10);
 
+        // Replace default shop archive count/ordering/pagination with theme's filter-aware toolbar & pagination
+        remove_action('woocommerce_before_shop_loop', 'woocommerce_result_count', 20);
+        remove_action('woocommerce_before_shop_loop', 'woocommerce_catalog_ordering', 30);
+        remove_action('woocommerce_after_shop_loop', 'woocommerce_pagination', 10);
+
         // Keep native WooCommerce AJAX cart counter synchronized in header badge
         add_filter('woocommerce_add_to_cart_fragments', [$this, 'syncCartCountFragment']);
 

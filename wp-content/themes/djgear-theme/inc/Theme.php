@@ -10,6 +10,7 @@ use DJGear\Theme\Security\Hardening;
 use DJGear\Theme\Setup\I18n;
 use DJGear\Theme\Setup\Menus;
 use DJGear\Theme\Setup\ThemeSupport;
+use DJGear\Theme\WooCommerce\ShopQuery;
 use DJGear\Theme\WooCommerce\SkinPortalIntegration;
 use DJGear\Theme\WooCommerce\WooCommerceSetup;
 
@@ -53,6 +54,7 @@ final class Theme
         $assetManager->register();
         (new FontPreloader($assetManager))->register();
         (new WooCommerceSetup())->register();
+        (new ShopQuery())->register();
         (new SkinPortalIntegration())->register();
         (new Hardening())->register();
     }

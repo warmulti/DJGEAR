@@ -314,3 +314,148 @@ msgstr ""
 
 msgid "Explore available DJ gear in our store or sign in to configure a custom skin for your setup."
 msgstr ""
+
+msgid "Default sorting"
+msgstr ""
+
+msgid "Sort by popularity"
+msgstr ""
+
+msgid "Sort by average rating"
+msgstr ""
+
+msgid "Sort by latest"
+msgstr ""
+
+msgid "Price: low to high"
+msgstr ""
+
+msgid "Price: high to low"
+msgstr ""
+
+msgid "DJGEAR STOREFRONT"
+msgstr ""
+
+msgid "PRODUCT CATEGORY"
+msgstr ""
+
+msgid "MANUFACTURER"
+msgstr ""
+
+msgid "PRODUCT TAG"
+msgstr ""
+
+msgid "Explore professional DJ equipment, studio essentials, and compatible accessories across the DJGear catalog."
+msgstr ""
+
+msgid "Category"
+msgstr ""
+
+msgid "Brand"
+msgstr ""
+
+msgid "Min price"
+msgstr ""
+
+msgid "Max price"
+msgstr ""
+
+msgid "In stock only"
+msgstr ""
+
+msgid "On sale"
+msgstr ""
+
+msgid "No products found"
+msgstr ""
+
+msgid "Showing %s product"
+msgid_plural "Showing all %s products"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Showing %1$s–%2$s of %3$s products"
+msgstr ""
+
+msgid "%s product"
+msgid_plural "%s products"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Product Filters"
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Clear all"
+msgstr ""
+
+msgid "Products pagination"
+msgstr ""
+
+msgid "Active filters"
+msgstr ""
+
+msgid "Sort by"
+msgstr ""
+
+msgid "Sort products"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Remove filter: %s"
+msgstr ""
+
+msgid "Clear all filters"
+msgstr ""
+
+msgid "Subcategories"
+msgstr ""
+
+msgid "Categories"
+msgstr ""
+
+msgid "Brands"
+msgstr ""
+
+msgid "Price range"
+msgstr ""
+
+msgid "Min"
+msgstr ""
+
+msgid "Max"
+msgstr ""
+
+msgid "Availability"
+msgstr ""
+
+msgid "Apply filters"
+msgstr ""
+
+msgid "Clear filters"
+msgstr ""
+
+msgid "Filter Products"
+msgstr ""
+
+msgid "Close filters"
+msgstr ""
+
+msgid "No products match your selected filters"
+msgstr ""
+
+msgid "Try removing one or more filters or adjusting your price range to see available DJ equipment."
+msgstr ""
+
+msgid "Browse all equipment"
+msgstr ""
+
+msgid "No products available yet"
+msgstr ""
+
+msgid "Products published in the WooCommerce catalog will appear here automatically."
+msgstr ""

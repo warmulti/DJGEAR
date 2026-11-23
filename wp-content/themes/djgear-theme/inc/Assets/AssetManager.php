@@ -13,6 +13,8 @@ final class AssetManager
     public const MAIN_STYLE_HANDLE  = 'djgear-theme-main-css';
     public const WC_STYLE_HANDLE    = 'djgear-theme-woocommerce-css';
     public const HOME_STYLE_HANDLE  = 'djgear-theme-homepage-css';
+    public const SHOP_SCRIPT_HANDLE = 'djgear-theme-shop';
+    public const SHOP_STYLE_HANDLE  = 'djgear-theme-shop-css';
 
     /** @var array<string, mixed>|null */
     private ?array $manifest = null;
@@ -144,11 +146,54 @@ final class AssetManager
                 );
             }
         }
+        // Conditional Shop & Product Archive assets (loaded strictly on shop/category/brand/tag archives)
+        if (self::isShopArchiveContext()) {
+            $shopEntry = $manifest['assets/src/scripts/shop.ts'] ?? null;
+            if (is_array($shopEntry)) {
+                if (isset($shopEntry['css']) && is_array($shopEntry['css'])) {
+                    foreach ($shopEntry['css'] as $idx => $cssFile) {
+                        if (is_string($cssFile) && $cssFile !== '') {
+                            wp_enqueue_style(
+                                $idx === 0 ? self::SHOP_STYLE_HANDLE : self::SHOP_STYLE_HANDLE . '-' . (string) $idx,
+                                $distUrl . ltrim($cssFile, '/'),
+                                [self::MAIN_STYLE_HANDLE],
+                                null
+                            );
+                        }
+                    }
+                }
+                if (isset($shopEntry['file']) && is_string($shopEntry['file']) && $shopEntry['file'] !== '') {
+                    wp_enqueue_script(
+                        self::SHOP_SCRIPT_HANDLE,
+                        $distUrl . ltrim($shopEntry['file'], '/'),
+                        [self::MAIN_SCRIPT_HANDLE],
+                        null,
+                        true
+                    );
+                }
+            }
+        }
+    }
+
+    public static function isShopArchiveContext(): bool
+    {
+        if (!class_exists('WooCommerce')) {
+            return false;
+        }
+
+        if (function_exists('is_shop') && is_shop()) {
+            return true;
+        }
+        if (function_exists('is_product_taxonomy') && is_product_taxonomy()) {
+            return true;
+        }
+
+        return is_search() && get_query_var('post_type') === 'product';
     }
 
     public function addModuleAttribute(string $tag, string $handle): string
     {
-        if ($handle !== self::MAIN_SCRIPT_HANDLE) {
+        if ($handle !== self::MAIN_SCRIPT_HANDLE && $handle !== self::SHOP_SCRIPT_HANDLE) {
             return $tag;
         }
 

@@ -358,7 +358,9 @@ final class HomepageData
     {
         $classes = ['djg-btn', 'djg-btn--secondary', 'djg-product-card__cta', 'button', 'product_type_' . $product->get_type()];
 
-        if ($product->is_purchasable() && $product->is_in_stock()) {
+        // Only simple in-stock purchasable products receive direct AJAX add-to-cart classes;
+        // variable, grouped, external, and out-of-stock products link directly to their product page.
+        if ($product->is_type('simple') && $product->is_purchasable() && $product->is_in_stock()) {
             $classes[] = 'add_to_cart_button';
             if ($product->supports('ajax_add_to_cart')) {
                 $classes[] = 'ajax_add_to_cart';

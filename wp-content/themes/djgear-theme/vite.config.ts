@@ -11,6 +11,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'assets/src/scripts/main.ts'),
+        shop: resolve(__dirname, 'assets/src/scripts/shop.ts'),
         woocommerce: resolve(__dirname, 'assets/src/styles/woocommerce-entry.css'),
         homepage: resolve(__dirname, 'assets/src/styles/homepage-entry.css'),
       },

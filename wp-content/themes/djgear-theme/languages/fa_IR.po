@@ -315,3 +315,148 @@ msgstr "کاتالوگ تجهیزات دی‌جی‌گیر را بررسی کن�
 
 msgid "Explore available DJ gear in our store or sign in to configure a custom skin for your setup."
 msgstr "تجهیزات موجود در فروشگاه را مشاهده کنید یا برای سفارش اسکین اختصاصی دستگاه خود وارد حساب کاربری شوید."
+
+msgid "Default sorting"
+msgstr "مرتب‌سازی پیش‌فرض"
+
+msgid "Sort by popularity"
+msgstr "محبوب‌ترین"
+
+msgid "Sort by average rating"
+msgstr "بیشترین امتیاز"
+
+msgid "Sort by latest"
+msgstr "جدیدترین"
+
+msgid "Price: low to high"
+msgstr "قیمت: از کم به زیاد"
+
+msgid "Price: high to low"
+msgstr "قیمت: از زیاد به کم"
+
+msgid "DJGEAR STOREFRONT"
+msgstr "فروشگاه دی‌جی‌گیر"
+
+msgid "PRODUCT CATEGORY"
+msgstr "دسته‌بندی محصولات"
+
+msgid "MANUFACTURER"
+msgstr "برند تولیدکننده"
+
+msgid "PRODUCT TAG"
+msgstr "برچسب محصول"
+
+msgid "Explore professional DJ equipment, studio essentials, and compatible accessories across the DJGear catalog."
+msgstr "تجهیزات حرفه‌ای دی‌جی، لوازم استودیویی و اقلام جانبی سازگار را در کاتالوگ دی‌جی‌گیر بررسی کنید."
+
+msgid "Category"
+msgstr "دسته‌بندی"
+
+msgid "Brand"
+msgstr "برند"
+
+msgid "Min price"
+msgstr "حداقل قیمت"
+
+msgid "Max price"
+msgstr "حداکثر قیمت"
+
+msgid "In stock only"
+msgstr "فقط کالاهای موجود"
+
+msgid "On sale"
+msgstr "تخفیف‌دار"
+
+msgid "No products found"
+msgstr "محصولی یافت نشد"
+
+msgid "Showing %s product"
+msgid_plural "Showing all %s products"
+msgstr[0] "نمایش %s محصول"
+msgstr[1] "نمایش همه %s محصول"
+
+msgid "Showing %1$s–%2$s of %3$s products"
+msgstr "نمایش %1$s تا %2$s از %3$s محصول"
+
+msgid "%s product"
+msgid_plural "%s products"
+msgstr[0] "%s محصول"
+msgstr[1] "%s محصول"
+
+msgid "Product Filters"
+msgstr "فیلتر محصولات"
+
+msgid "Filters"
+msgstr "فیلترها"
+
+msgid "Clear all"
+msgstr "حذف همه"
+
+msgid "Products pagination"
+msgstr "صفحه‌بندی محصولات"
+
+msgid "Active filters"
+msgstr "فیلترهای فعال"
+
+msgid "Sort by"
+msgstr "مرتب‌سازی"
+
+msgid "Sort products"
+msgstr "مرتب‌سازی محصولات"
+
+msgid "Apply"
+msgstr "اعمال"
+
+msgid "Remove filter: %s"
+msgstr "حذف فیلتر: %s"
+
+msgid "Clear all filters"
+msgstr "پاک کردن همه فیلترها"
+
+msgid "Subcategories"
+msgstr "زیردسته‌ها"
+
+msgid "Categories"
+msgstr "دسته‌بندی‌ها"
+
+msgid "Brands"
+msgstr "برندها"
+
+msgid "Price range"
+msgstr "محدوده قیمت"
+
+msgid "Min"
+msgstr "حداقل"
+
+msgid "Max"
+msgstr "حداکثر"
+
+msgid "Availability"
+msgstr "وضعیت موجودی"
+
+msgid "Apply filters"
+msgstr "اعمال فیلترها"
+
+msgid "Clear filters"
+msgstr "پاک کردن فیلترها"
+
+msgid "Filter Products"
+msgstr "فیلتر محصولات"
+
+msgid "Close filters"
+msgstr "بستن فیلترها"
+
+msgid "No products match your selected filters"
+msgstr "محصولی مطابق با فیلترهای انتخابی شما یافت نشد"
+
+msgid "Try removing one or more filters or adjusting your price range to see available DJ equipment."
+msgstr "برای مشاهده تجهیزات موجود، یک یا چند فیلتر را حذف کنید یا محدوده قیمت را تغییر دهید."
+
+msgid "Browse all equipment"
+msgstr "مشاهده همه تجهیزات"
+
+msgid "No products available yet"
+msgstr "هنوز محصولی منتشر نشده است"
+
+msgid "Products published in the WooCommerce catalog will appear here automatically."
+msgstr "محصولات منتشرشده در فروشگاه ووکامرس به‌صورت خودکار در این بخش نمایش داده می‌شوند."
