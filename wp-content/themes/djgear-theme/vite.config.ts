@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'assets/src/scripts/main.ts'),
         woocommerce: resolve(__dirname, 'assets/src/styles/woocommerce-entry.css'),
+        homepage: resolve(__dirname, 'assets/src/styles/homepage-entry.css'),
       },
     },
   },

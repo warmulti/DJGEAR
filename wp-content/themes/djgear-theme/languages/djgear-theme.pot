@@ -168,3 +168,149 @@ msgstr ""
 
 msgid "© %1$s %2$s. All rights reserved."
 msgstr ""
+
+msgid "DJGEAR · PRO AUDIO & CUSTOM SKINS"
+msgstr ""
+
+msgid "Precision DJ hardware & bespoke equipment skins."
+msgstr ""
+
+msgid "Curated controllers, media players, mixers, and studio essentials alongside a dedicated custom skin ordering experience tailored to compatible DJ models."
+msgstr ""
+
+msgid "Explore Equipment"
+msgstr ""
+
+msgid "Explore Custom Skins"
+msgstr ""
+
+msgid "Professional DJ equipment setup at DJGear"
+msgstr ""
+
+msgid "Matte-black professional DJ controller and turntable console in a dark studio environment"
+msgstr ""
+
+msgid "EQUIPMENT CATEGORIES"
+msgstr ""
+
+msgid "Shop by category"
+msgstr ""
+
+msgid "View all categories"
+msgstr ""
+
+msgid "%s item"
+msgid_plural "%s items"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "FEATURED SELECTION"
+msgstr ""
+
+msgid "Featured DJ equipment"
+msgstr ""
+
+msgid "Explore full catalog"
+msgstr ""
+
+msgid "Published products from the WooCommerce catalog will appear here automatically once added to the store."
+msgstr ""
+
+msgid "Go to Shop"
+msgstr ""
+
+msgid "Sale"
+msgstr ""
+
+msgid "DJGear"
+msgstr ""
+
+msgid "In stock"
+msgstr ""
+
+msgid "Low stock"
+msgstr ""
+
+msgid "Backorder"
+msgstr ""
+
+msgid "Out of stock"
+msgstr ""
+
+msgid "MANUFACTURERS"
+msgstr ""
+
+msgid "Available brands"
+msgstr ""
+
+msgid "CUSTOM EQUIPMENT SKINS"
+msgstr ""
+
+msgid "Tailor the finish of your compatible DJ gear."
+msgstr ""
+
+msgid "Choose your DJ device model, select a skin finish and color, and pick either a ready-made Standard plan or a Custom Design plan with artwork upload and proof approval before production."
+msgstr ""
+
+msgid "Open Custom Skins Portal"
+msgstr ""
+
+msgid "Custom Skin ordering steps"
+msgstr ""
+
+msgid "Select your DJ device"
+msgstr ""
+
+msgid "Pick from active, compatible models in the DJGear device catalog."
+msgstr ""
+
+msgid "Pick skin model, color & plan"
+msgstr ""
+
+msgid "Order a Standard finish immediately or choose Custom Design to upload your own artwork."
+msgstr ""
+
+msgid "Checkout & track production"
+msgstr ""
+
+msgid "Complete payment via WooCommerce and follow proof approval and production milestones from My Account."
+msgstr ""
+
+msgid "THE DJGEAR PLATFORM"
+msgstr ""
+
+msgid "Purpose-built for working DJs and studios"
+msgstr ""
+
+msgid "Structured DJ Equipment Catalog"
+msgstr ""
+
+msgid "Equipment is organized by manufacturer, category, and technical specifications so you can identify compatible hardware accurately."
+msgstr ""
+
+msgid "Commercial Custom Skin Workflow"
+msgstr ""
+
+msgid "Custom Design orders include automated print-resolution validation and explicit customer proof approval before entering production."
+msgstr ""
+
+msgid "Native WooCommerce Checkout & Tracking"
+msgstr ""
+
+msgid "Hardware purchases and custom skin orders share a single WooCommerce cart, checkout, and My Account order history."
+msgstr ""
+
+msgid "Built for Persian RTL & English LTR"
+msgstr ""
+
+msgid "Every storefront flow is crafted natively for both Persian and English readers with clear typography and responsive mobile controls."
+msgstr ""
+
+msgid "READY FOR THE BOOTH"
+msgstr ""
+
+msgid "Browse the DJGear equipment catalog."
+msgstr ""
+
+msgid "Explore available DJ gear in our store or sign in to configure a custom skin for your setup."
+msgstr ""

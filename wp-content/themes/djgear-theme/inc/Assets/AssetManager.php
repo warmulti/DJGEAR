@@ -12,6 +12,7 @@ final class AssetManager
     public const MAIN_SCRIPT_HANDLE = 'djgear-theme-main';
     public const MAIN_STYLE_HANDLE  = 'djgear-theme-main-css';
     public const WC_STYLE_HANDLE    = 'djgear-theme-woocommerce-css';
+    public const HOME_STYLE_HANDLE  = 'djgear-theme-homepage-css';
 
     /** @var array<string, mixed>|null */
     private ?array $manifest = null;
@@ -125,6 +126,19 @@ final class AssetManager
                 wp_enqueue_style(
                     self::WC_STYLE_HANDLE,
                     $distUrl . ltrim($wcEntry['file'], '/'),
+                    [self::MAIN_STYLE_HANDLE],
+                    null
+                );
+            }
+        }
+
+        // Conditional Homepage stylesheet (loaded strictly on front page)
+        if (is_front_page()) {
+            $homeEntry = $manifest['assets/src/styles/homepage-entry.css'] ?? null;
+            if (is_array($homeEntry) && isset($homeEntry['file']) && is_string($homeEntry['file']) && $homeEntry['file'] !== '') {
+                wp_enqueue_style(
+                    self::HOME_STYLE_HANDLE,
+                    $distUrl . ltrim($homeEntry['file'], '/'),
                     [self::MAIN_STYLE_HANDLE],
                     null
                 );

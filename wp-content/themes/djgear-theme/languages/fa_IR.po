@@ -169,3 +169,149 @@ msgstr "حریم خصوصی"
 
 msgid "© %1$s %2$s. All rights reserved."
 msgstr "© %1$s %2$s. تمامی حقوق محفوظ است."
+
+msgid "DJGEAR · PRO AUDIO & CUSTOM SKINS"
+msgstr "دی‌جی‌گیر · تجهیزات حرفه‌ای دی‌جی و اسکین اختصاصی"
+
+msgid "Precision DJ hardware & bespoke equipment skins."
+msgstr "تجهیزات حرفه‌ای دی‌جی و اسکین‌های اختصاصی دستگاه."
+
+msgid "Curated controllers, media players, mixers, and studio essentials alongside a dedicated custom skin ordering experience tailored to compatible DJ models."
+msgstr "مجموعه‌ای منتخب از کنترلرها، مدیاپلیرها، میکسرها و لوازم استودیویی در کنار سامانه اختصاصی سفارش اسکین برای مدل‌های سازگار دی‌جی."
+
+msgid "Explore Equipment"
+msgstr "مشاهده تجهیزات"
+
+msgid "Explore Custom Skins"
+msgstr "مشاهده اسکین‌های اختصاصی"
+
+msgid "Professional DJ equipment setup at DJGear"
+msgstr "چیدمان تجهیزات حرفه‌ای دی‌جی در دی‌جی‌گیر"
+
+msgid "Matte-black professional DJ controller and turntable console in a dark studio environment"
+msgstr "کنترلر و کنسول دی‌جی حرفه‌ای مشکی مات در فضای استودیویی تاریک"
+
+msgid "EQUIPMENT CATEGORIES"
+msgstr "دسته‌بندی تجهیزات"
+
+msgid "Shop by category"
+msgstr "خرید بر اساس دسته‌بندی"
+
+msgid "View all categories"
+msgstr "مشاهده همه دسته‌بندی‌ها"
+
+msgid "%s item"
+msgid_plural "%s items"
+msgstr[0] "%s محصول"
+msgstr[1] "%s محصول"
+
+msgid "FEATURED SELECTION"
+msgstr "منتخب فروشگاه"
+
+msgid "Featured DJ equipment"
+msgstr "تجهیزات منتخب دی‌جی"
+
+msgid "Explore full catalog"
+msgstr "مشاهده کل فروشگاه"
+
+msgid "Published products from the WooCommerce catalog will appear here automatically once added to the store."
+msgstr "محصولات منتشرشده در فروشگاه ووکامرس پس از افزودن به کاتالوگ به‌صورت خودکار در این بخش نمایش داده می‌شوند."
+
+msgid "Go to Shop"
+msgstr "ورود به فروشگاه"
+
+msgid "Sale"
+msgstr "تخفیف"
+
+msgid "DJGear"
+msgstr "دی‌جی‌گیر"
+
+msgid "In stock"
+msgstr "موجود"
+
+msgid "Low stock"
+msgstr "موجودی محدود"
+
+msgid "Backorder"
+msgstr "پیش‌سفارش"
+
+msgid "Out of stock"
+msgstr "ناموجود"
+
+msgid "MANUFACTURERS"
+msgstr "برندها و تولیدکنندگان"
+
+msgid "Available brands"
+msgstr "برندهای موجود"
+
+msgid "CUSTOM EQUIPMENT SKINS"
+msgstr "اسکین اختصاصی تجهیزات"
+
+msgid "Tailor the finish of your compatible DJ gear."
+msgstr "ظاهر دستگاه دی‌جی خود را به‌صورت اختصاصی شخصی‌سازی کنید."
+
+msgid "Choose your DJ device model, select a skin finish and color, and pick either a ready-made Standard plan or a Custom Design plan with artwork upload and proof approval before production."
+msgstr "مدل دستگاه دی‌جی خود را انتخاب کنید، طرح و رنگ اسکین را برگزینید و میان پلن آماده استاندارد یا پلن طراحی اختصاصی با بارگذاری طرح و تأیید پیش‌نمایش پیش از تولید انتخاب کنید."
+
+msgid "Open Custom Skins Portal"
+msgstr "ورود به بخش اسکین‌های اختصاصی"
+
+msgid "Custom Skin ordering steps"
+msgstr "مراحل سفارش اسکین اختصاصی"
+
+msgid "Select your DJ device"
+msgstr "انتخاب دستگاه دی‌جی"
+
+msgid "Pick from active, compatible models in the DJGear device catalog."
+msgstr "از میان مدل‌های فعال و سازگار در کاتالوگ دستگاه‌های دی‌جی‌گیر انتخاب کنید."
+
+msgid "Pick skin model, color & plan"
+msgstr "انتخاب مدل اسکین، رنگ و پلن"
+
+msgid "Order a Standard finish immediately or choose Custom Design to upload your own artwork."
+msgstr "پلن استاندارد را مستقیم سفارش دهید یا با انتخاب طراحی اختصاصی طرح دلخواه خود را بارگذاری کنید."
+
+msgid "Checkout & track production"
+msgstr "تسویه حساب و پیگیری تولید"
+
+msgid "Complete payment via WooCommerce and follow proof approval and production milestones from My Account."
+msgstr "پرداخت را از طریق ووکامرس تکمیل کنید و مراحل تأیید پیش‌نمایش و تولید را در حساب کاربری پیگیری نمایید."
+
+msgid "THE DJGEAR PLATFORM"
+msgstr "پلتفرم دی‌جی‌گیر"
+
+msgid "Purpose-built for working DJs and studios"
+msgstr "ساخته‌شده برای دی‌جی‌های حرفه‌ای و استودیوها"
+
+msgid "Structured DJ Equipment Catalog"
+msgstr "کاتالوگ ساختاریافته تجهیزات دی‌جی"
+
+msgid "Equipment is organized by manufacturer, category, and technical specifications so you can identify compatible hardware accurately."
+msgstr "تجهیزات بر اساس برند، دسته‌بندی و مشخصات فنی دسته‌بندی شده‌اند تا سخت‌افزار سازگار را دقیق انتخاب کنید."
+
+msgid "Commercial Custom Skin Workflow"
+msgstr "فرآیند اختصاصی سفارش اسکین"
+
+msgid "Custom Design orders include automated print-resolution validation and explicit customer proof approval before entering production."
+msgstr "سفارش‌های طراحی اختصاصی شامل بررسی خودکار کیفیت چاپ (DPI) و تأیید صریح پیش‌نمایش توسط مشتری پیش از ورود به تولید هستند."
+
+msgid "Native WooCommerce Checkout & Tracking"
+msgstr "تسویه حساب و پیگیری یکپارچه ووکامرس"
+
+msgid "Hardware purchases and custom skin orders share a single WooCommerce cart, checkout, and My Account order history."
+msgstr "خرید تجهیزات و سفارش اسکین‌های اختصاصی در یک سبد خرید، تسویه حساب و تاریخچه سفارش مشترک در حساب کاربری مدیریت می‌شوند."
+
+msgid "Built for Persian RTL & English LTR"
+msgstr "طراحی بومی فارسی (RTL) و انگلیسی (LTR)"
+
+msgid "Every storefront flow is crafted natively for both Persian and English readers with clear typography and responsive mobile controls."
+msgstr "تمامی بخش‌های فروشگاه به‌صورت بومی برای زبان فارسی و انگلیسی با تایپوگرافی خوانا و تجربه روان موبایل طراحی شده‌اند."
+
+msgid "READY FOR THE BOOTH"
+msgstr "آماده برای اجرا"
+
+msgid "Browse the DJGear equipment catalog."
+msgstr "کاتالوگ تجهیزات دی‌جی‌گیر را بررسی کنید."
+
+msgid "Explore available DJ gear in our store or sign in to configure a custom skin for your setup."
+msgstr "تجهیزات موجود در فروشگاه را مشاهده کنید یا برای سفارش اسکین اختصاصی دستگاه خود وارد حساب کاربری شوید."
