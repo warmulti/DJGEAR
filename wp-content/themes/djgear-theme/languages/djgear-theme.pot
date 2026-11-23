@@ -623,3 +623,12 @@ msgstr ""
 
 msgid "View"
 msgstr ""
+
+msgid "CUSTOM EQUIPMENT SKINS"
+msgstr ""
+
+msgid "Select your compatible DJ device, choose a finish and ordering plan, optionally upload custom print artwork, and complete checkout natively through WooCommerce."
+msgstr ""
+
+msgid "The Custom Skins ordering module is currently unavailable."
+msgstr ""

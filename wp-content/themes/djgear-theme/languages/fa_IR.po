@@ -624,3 +624,12 @@ msgstr "مشاهده همه سفارش‌ها"
 
 msgid "View"
 msgstr "مشاهده"
+
+msgid "CUSTOM EQUIPMENT SKINS"
+msgstr "اسکین‌های اختصاصی تجهیزات دی‌جی"
+
+msgid "Select your compatible DJ device, choose a finish and ordering plan, optionally upload custom print artwork, and complete checkout natively through WooCommerce."
+msgstr "دستگاه دی‌جی سازگار خود را انتخاب کنید، مدل و پلن سفارش را مشخص نمایید، در صورت نیاز طرح اختصاصی خود را بارگذاری کنید و تسویه حساب را از طریق ووکامرس تکمیل نمایید."
+
+msgid "The Custom Skins ordering module is currently unavailable."
+msgstr "ماژول سفارش اسکین اختصاصی در حال حاضر در دسترس نیست."

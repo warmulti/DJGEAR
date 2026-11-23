@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DJGear\Theme\Assets;
 
 use DJGear\Theme\Template\CommerceAccountData;
+use DJGear\Theme\WooCommerce\SkinPortalIntegration;
 
 /**
  * Vite manifest-backed asset loader with conditional WooCommerce loading and cache busting.
@@ -21,6 +22,8 @@ final class AssetManager
     public const PRODUCT_STYLE_HANDLE   = 'djgear-theme-product-css';
     public const COMMERCE_SCRIPT_HANDLE = 'djgear-theme-commerce-account';
     public const COMMERCE_STYLE_HANDLE  = 'djgear-theme-commerce-account-css';
+    public const SKINS_SCRIPT_HANDLE    = 'djgear-theme-skins';
+    public const SKINS_STYLE_HANDLE     = 'djgear-theme-skins-css';
 
     /** @var array<string, mixed>|null */
     private ?array $manifest = null;
@@ -233,6 +236,33 @@ final class AssetManager
                 }
             }
         }
+        // Conditional Custom Skins Configurator & My Account Tracking assets
+        if (SkinPortalIntegration::isCustomSkinsContext()) {
+            $skinsEntry = $manifest['assets/src/scripts/skins-experience.ts'] ?? null;
+            if (is_array($skinsEntry)) {
+                if (isset($skinsEntry['css']) && is_array($skinsEntry['css'])) {
+                    foreach ($skinsEntry['css'] as $idx => $cssFile) {
+                        if (is_string($cssFile) && $cssFile !== '') {
+                            wp_enqueue_style(
+                                $idx === 0 ? self::SKINS_STYLE_HANDLE : self::SKINS_STYLE_HANDLE . '-' . (string) $idx,
+                                $distUrl . ltrim($cssFile, '/'),
+                                [self::MAIN_STYLE_HANDLE],
+                                null
+                            );
+                        }
+                    }
+                }
+                if (isset($skinsEntry['file']) && is_string($skinsEntry['file']) && $skinsEntry['file'] !== '') {
+                    wp_enqueue_script(
+                        self::SKINS_SCRIPT_HANDLE,
+                        $distUrl . ltrim($skinsEntry['file'], '/'),
+                        [self::MAIN_SCRIPT_HANDLE],
+                        null,
+                        true
+                    );
+                }
+            }
+        }
     }
 
     public static function isShopArchiveContext(): bool
@@ -258,6 +288,7 @@ final class AssetManager
             && $handle !== self::SHOP_SCRIPT_HANDLE
             && $handle !== self::PRODUCT_SCRIPT_HANDLE
             && $handle !== self::COMMERCE_SCRIPT_HANDLE
+            && $handle !== self::SKINS_SCRIPT_HANDLE
         ) {
             return $tag;
         }
