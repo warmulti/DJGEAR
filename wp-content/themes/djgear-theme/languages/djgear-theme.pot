@@ -533,3 +533,93 @@ msgstr ""
 
 msgid "Related DJ equipment"
 msgstr ""
+
+msgid "ORDER CONFIRMATION"
+msgstr ""
+
+msgid "Thank you for your order"
+msgstr ""
+
+msgid "Review your WooCommerce order summary and next steps below."
+msgstr ""
+
+msgid "PAYMENT"
+msgstr ""
+
+msgid "Complete order payment"
+msgstr ""
+
+msgid "Select a configured payment method below to complete this order."
+msgstr ""
+
+msgid "SECURE CHECKOUT"
+msgstr ""
+
+msgid "Verify billing, shipping, and payment details to place your order."
+msgstr ""
+
+msgid "SHOPPING CART"
+msgstr ""
+
+msgid "Cart"
+msgstr ""
+
+msgid "Review selected DJ equipment and custom skin configurations before checkout."
+msgstr ""
+
+msgid "CUSTOMER ACCOUNT"
+msgstr ""
+
+msgid "Reset password"
+msgstr ""
+
+msgid "Enter your account email or username to receive a password reset link."
+msgstr ""
+
+msgid "Sign in to manage orders, addresses, and custom skin proof approvals."
+msgstr ""
+
+msgid "Customer"
+msgstr ""
+
+msgid "Signed in as %s. Track orders, update addresses, and manage custom skin orders."
+msgstr ""
+
+msgid "Orders"
+msgstr ""
+
+msgid "View order history, payment status, and receipts."
+msgstr ""
+
+msgid "Custom Skin Orders"
+msgstr ""
+
+msgid "Track skin production stages, artwork uploads, and proof approvals."
+msgstr ""
+
+msgid "Addresses"
+msgstr ""
+
+msgid "Manage billing and shipping addresses for faster checkout."
+msgstr ""
+
+msgid "Account Details"
+msgstr ""
+
+msgid "Update your name, email address, and account password."
+msgstr ""
+
+msgid "Confirmation"
+msgstr ""
+
+msgid "Checkout progress"
+msgstr ""
+
+msgid "Recent orders"
+msgstr ""
+
+msgid "View all orders"
+msgstr ""
+
+msgid "View"
+msgstr ""

@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use DJGear\Theme\Template\CommerceAccountData;
+
 if (!defined('ABSPATH')) {
     exit;
 }
 
 get_header();
+$isCommerceAccount = CommerceAccountData::isCommerceAccountPage();
 ?>
-<div class="djg-container djg-page-shell">
+<div class="djg-container djg-page-shell<?php echo $isCommerceAccount ? ' djg-commerce-shell' : ''; ?>">
     <?php get_template_part('template-parts/components/breadcrumbs'); ?>
 
     <?php
@@ -16,9 +19,13 @@ get_header();
         the_post();
         ?>
         <article id="post-<?php the_ID(); ?>" <?php post_class('djg-page-article'); ?>>
-            <header class="djg-page-header">
-                <h1 class="djg-page-title"><?php the_title(); ?></h1>
-            </header>
+            <?php if ($isCommerceAccount) : ?>
+                <?php get_template_part('template-parts/commerce/page-header'); ?>
+            <?php else : ?>
+                <header class="djg-page-header">
+                    <h1 class="djg-page-title"><?php the_title(); ?></h1>
+                </header>
+            <?php endif; ?>
             <div class="djg-entry-content">
                 <?php
                 the_content();

@@ -13,6 +13,7 @@ export default defineConfig({
         main: resolve(__dirname, 'assets/src/scripts/main.ts'),
         shop: resolve(__dirname, 'assets/src/scripts/shop.ts'),
         product: resolve(__dirname, 'assets/src/scripts/product.ts'),
+        commerceAccount: resolve(__dirname, 'assets/src/scripts/commerce-account.ts'),
         woocommerce: resolve(__dirname, 'assets/src/styles/woocommerce-entry.css'),
         homepage: resolve(__dirname, 'assets/src/styles/homepage-entry.css'),
       },

@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace DJGear\Theme\Assets;
 
+use DJGear\Theme\Template\CommerceAccountData;
+
 /**
  * Vite manifest-backed asset loader with conditional WooCommerce loading and cache busting.
  */
 final class AssetManager
 {
-    public const MAIN_SCRIPT_HANDLE = 'djgear-theme-main';
-    public const MAIN_STYLE_HANDLE  = 'djgear-theme-main-css';
-    public const WC_STYLE_HANDLE    = 'djgear-theme-woocommerce-css';
-    public const HOME_STYLE_HANDLE  = 'djgear-theme-homepage-css';
-    public const SHOP_SCRIPT_HANDLE    = 'djgear-theme-shop';
-    public const SHOP_STYLE_HANDLE     = 'djgear-theme-shop-css';
-    public const PRODUCT_SCRIPT_HANDLE = 'djgear-theme-product';
-    public const PRODUCT_STYLE_HANDLE  = 'djgear-theme-product-css';
+    public const MAIN_SCRIPT_HANDLE     = 'djgear-theme-main';
+    public const MAIN_STYLE_HANDLE      = 'djgear-theme-main-css';
+    public const WC_STYLE_HANDLE        = 'djgear-theme-woocommerce-css';
+    public const HOME_STYLE_HANDLE      = 'djgear-theme-homepage-css';
+    public const SHOP_SCRIPT_HANDLE     = 'djgear-theme-shop';
+    public const SHOP_STYLE_HANDLE      = 'djgear-theme-shop-css';
+    public const PRODUCT_SCRIPT_HANDLE  = 'djgear-theme-product';
+    public const PRODUCT_STYLE_HANDLE   = 'djgear-theme-product-css';
+    public const COMMERCE_SCRIPT_HANDLE = 'djgear-theme-commerce-account';
+    public const COMMERCE_STYLE_HANDLE  = 'djgear-theme-commerce-account-css';
 
     /** @var array<string, mixed>|null */
     private ?array $manifest = null;
@@ -202,6 +206,33 @@ final class AssetManager
                 }
             }
         }
+        // Conditional Cart, Checkout & My Account assets (loaded strictly on commerce/account routes)
+        if (CommerceAccountData::isCommerceAccountPage()) {
+            $commerceEntry = $manifest['assets/src/scripts/commerce-account.ts'] ?? null;
+            if (is_array($commerceEntry)) {
+                if (isset($commerceEntry['css']) && is_array($commerceEntry['css'])) {
+                    foreach ($commerceEntry['css'] as $idx => $cssFile) {
+                        if (is_string($cssFile) && $cssFile !== '') {
+                            wp_enqueue_style(
+                                $idx === 0 ? self::COMMERCE_STYLE_HANDLE : self::COMMERCE_STYLE_HANDLE . '-' . (string) $idx,
+                                $distUrl . ltrim($cssFile, '/'),
+                                [self::MAIN_STYLE_HANDLE],
+                                null
+                            );
+                        }
+                    }
+                }
+                if (isset($commerceEntry['file']) && is_string($commerceEntry['file']) && $commerceEntry['file'] !== '') {
+                    wp_enqueue_script(
+                        self::COMMERCE_SCRIPT_HANDLE,
+                        $distUrl . ltrim($commerceEntry['file'], '/'),
+                        [self::MAIN_SCRIPT_HANDLE],
+                        null,
+                        true
+                    );
+                }
+            }
+        }
     }
 
     public static function isShopArchiveContext(): bool
@@ -226,6 +257,7 @@ final class AssetManager
             $handle !== self::MAIN_SCRIPT_HANDLE
             && $handle !== self::SHOP_SCRIPT_HANDLE
             && $handle !== self::PRODUCT_SCRIPT_HANDLE
+            && $handle !== self::COMMERCE_SCRIPT_HANDLE
         ) {
             return $tag;
         }

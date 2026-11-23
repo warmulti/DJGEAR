@@ -534,3 +534,93 @@ msgstr "محصولات مشابه"
 
 msgid "Related DJ equipment"
 msgstr "تجهیزات مرتبط دی‌جی"
+
+msgid "ORDER CONFIRMATION"
+msgstr "تأیید سفارش"
+
+msgid "Thank you for your order"
+msgstr "از سفارش شما سپاسگزاریم"
+
+msgid "Review your WooCommerce order summary and next steps below."
+msgstr "خلاصه سفارش ووکامرس و مراحل بعدی را در زیر بررسی کنید."
+
+msgid "PAYMENT"
+msgstr "پرداخت"
+
+msgid "Complete order payment"
+msgstr "تکمیل پرداخت سفارش"
+
+msgid "Select a configured payment method below to complete this order."
+msgstr "برای تکمیل این سفارش، یکی از روش‌های پرداخت فعال را انتخاب کنید."
+
+msgid "SECURE CHECKOUT"
+msgstr "تسویه حساب امن"
+
+msgid "Verify billing, shipping, and payment details to place your order."
+msgstr "اطلاعات صورت‌حساب، ارسال و پرداخت را برای ثبت نهایی سفارش بررسی کنید."
+
+msgid "SHOPPING CART"
+msgstr "سبد خرید"
+
+msgid "Cart"
+msgstr "سبد خرید"
+
+msgid "Review selected DJ equipment and custom skin configurations before checkout."
+msgstr "تجهیزات دی‌جی و پیکربندی‌های اسکین اختصاصی انتخاب‌شده را پیش از تسویه حساب بررسی کنید."
+
+msgid "CUSTOMER ACCOUNT"
+msgstr "حساب کاربری"
+
+msgid "Reset password"
+msgstr "بازیابی رمز عبور"
+
+msgid "Enter your account email or username to receive a password reset link."
+msgstr "ایمیل یا نام کاربری خود را وارد کنید تا لینک بازیابی رمز عبور ارسال شود."
+
+msgid "Sign in to manage orders, addresses, and custom skin proof approvals."
+msgstr "برای مدیریت سفارش‌ها، نشانی‌ها و تأیید پیش‌نمایش اسکین‌های اختصاصی وارد شوید."
+
+msgid "Customer"
+msgstr "مشتری"
+
+msgid "Signed in as %s. Track orders, update addresses, and manage custom skin orders."
+msgstr "واردشده با نام %s. سفارش‌ها را پیگیری کنید، نشانی‌ها را ویرایش کنید و اسکین‌های اختصاصی را مدیریت نمایید."
+
+msgid "Orders"
+msgstr "سفارش‌ها"
+
+msgid "View order history, payment status, and receipts."
+msgstr "مشاهده تاریخچه سفارش‌ها، وضعیت پرداخت و رسیدها."
+
+msgid "Custom Skin Orders"
+msgstr "سفارش‌های اسکین اختصاصی"
+
+msgid "Track skin production stages, artwork uploads, and proof approvals."
+msgstr "پیگیری مراحل تولید اسکین، بارگذاری طرح و تأیید پیش‌نمایش."
+
+msgid "Addresses"
+msgstr "نشانی‌ها"
+
+msgid "Manage billing and shipping addresses for faster checkout."
+msgstr "مدیریت نشانی‌های صورت‌حساب و ارسال برای تسویه حساب سریع‌تر."
+
+msgid "Account Details"
+msgstr "جزئیات حساب کاربری"
+
+msgid "Update your name, email address, and account password."
+msgstr "ویرایش نام، نشانی ایمیل و رمز عبور حساب کاربری."
+
+msgid "Confirmation"
+msgstr "تأیید نهایی"
+
+msgid "Checkout progress"
+msgstr "مراحل تسویه حساب"
+
+msgid "Recent orders"
+msgstr "سفارش‌های اخیر"
+
+msgid "View all orders"
+msgstr "مشاهده همه سفارش‌ها"
+
+msgid "View"
+msgstr "مشاهده"
