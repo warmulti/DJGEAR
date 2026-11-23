@@ -13,8 +13,10 @@ final class AssetManager
     public const MAIN_STYLE_HANDLE  = 'djgear-theme-main-css';
     public const WC_STYLE_HANDLE    = 'djgear-theme-woocommerce-css';
     public const HOME_STYLE_HANDLE  = 'djgear-theme-homepage-css';
-    public const SHOP_SCRIPT_HANDLE = 'djgear-theme-shop';
-    public const SHOP_STYLE_HANDLE  = 'djgear-theme-shop-css';
+    public const SHOP_SCRIPT_HANDLE    = 'djgear-theme-shop';
+    public const SHOP_STYLE_HANDLE     = 'djgear-theme-shop-css';
+    public const PRODUCT_SCRIPT_HANDLE = 'djgear-theme-product';
+    public const PRODUCT_STYLE_HANDLE  = 'djgear-theme-product-css';
 
     /** @var array<string, mixed>|null */
     private ?array $manifest = null;
@@ -173,6 +175,33 @@ final class AssetManager
                 }
             }
         }
+        // Conditional Single Product assets (loaded strictly on single product pages)
+        if (class_exists('WooCommerce') && function_exists('is_product') && is_product()) {
+            $productEntry = $manifest['assets/src/scripts/product.ts'] ?? null;
+            if (is_array($productEntry)) {
+                if (isset($productEntry['css']) && is_array($productEntry['css'])) {
+                    foreach ($productEntry['css'] as $idx => $cssFile) {
+                        if (is_string($cssFile) && $cssFile !== '') {
+                            wp_enqueue_style(
+                                $idx === 0 ? self::PRODUCT_STYLE_HANDLE : self::PRODUCT_STYLE_HANDLE . '-' . (string) $idx,
+                                $distUrl . ltrim($cssFile, '/'),
+                                [self::MAIN_STYLE_HANDLE],
+                                null
+                            );
+                        }
+                    }
+                }
+                if (isset($productEntry['file']) && is_string($productEntry['file']) && $productEntry['file'] !== '') {
+                    wp_enqueue_script(
+                        self::PRODUCT_SCRIPT_HANDLE,
+                        $distUrl . ltrim($productEntry['file'], '/'),
+                        [self::MAIN_SCRIPT_HANDLE],
+                        null,
+                        true
+                    );
+                }
+            }
+        }
     }
 
     public static function isShopArchiveContext(): bool
@@ -193,7 +222,11 @@ final class AssetManager
 
     public function addModuleAttribute(string $tag, string $handle): string
     {
-        if ($handle !== self::MAIN_SCRIPT_HANDLE && $handle !== self::SHOP_SCRIPT_HANDLE) {
+        if (
+            $handle !== self::MAIN_SCRIPT_HANDLE
+            && $handle !== self::SHOP_SCRIPT_HANDLE
+            && $handle !== self::PRODUCT_SCRIPT_HANDLE
+        ) {
             return $tag;
         }
 

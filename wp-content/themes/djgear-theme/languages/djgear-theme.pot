@@ -459,3 +459,77 @@ msgstr ""
 
 msgid "Products published in the WooCommerce catalog will appear here automatically."
 msgstr ""
+
+msgid "%1$s — view %2$d"
+msgstr ""
+
+msgid "Custom Skin available for this device"
+msgstr ""
+
+msgid "Personalize your %s with a Standard finish or Custom Design artwork through the DJGear Custom Skins portal."
+msgstr ""
+
+msgid "Configure Custom Skin"
+msgstr ""
+
+msgid "Order through Custom Skins Portal"
+msgstr ""
+
+msgid "Select your DJ device model, finish, and Standard or Custom Design plan in the dedicated Custom Skins workflow."
+msgstr ""
+
+msgid "Custom DJ Equipment Skins"
+msgstr ""
+
+msgid "Explore compatible DJ devices and custom skin finishes in the DJGear Custom Skins portal."
+msgstr ""
+
+msgid "Expand product image"
+msgstr ""
+
+msgid "Product image unavailable"
+msgstr ""
+
+msgid "Product image thumbnails"
+msgstr ""
+
+msgid "Show product image %d"
+msgstr ""
+
+msgid "Expanded product image"
+msgstr ""
+
+msgid "Close image viewer"
+msgstr ""
+
+msgid "Rated %s out of 5"
+msgstr ""
+
+msgid "(%s review)"
+msgid_plural "(%s reviews)"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Compatible DJ equipment"
+msgstr ""
+
+msgid "Compatible DJ Equipment"
+msgstr ""
+
+msgid "SKU"
+msgstr ""
+
+msgid "N/A"
+msgstr ""
+
+msgid "Tags"
+msgstr ""
+
+msgid "Product details and reviews"
+msgstr ""
+
+msgid "YOU MAY ALSO LIKE"
+msgstr ""
+
+msgid "Related DJ equipment"
+msgstr ""

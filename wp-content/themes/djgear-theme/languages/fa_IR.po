@@ -460,3 +460,77 @@ msgstr "هنوز محصولی منتشر نشده است"
 
 msgid "Products published in the WooCommerce catalog will appear here automatically."
 msgstr "محصولات منتشرشده در فروشگاه ووکامرس به‌صورت خودکار در این بخش نمایش داده می‌شوند."
+
+msgid "%1$s — view %2$d"
+msgstr "%1$s — نمای %2$d"
+
+msgid "Custom Skin available for this device"
+msgstr "اسکین اختصاصی برای این دستگاه موجود است"
+
+msgid "Personalize your %s with a Standard finish or Custom Design artwork through the DJGear Custom Skins portal."
+msgstr "دستگاه %s خود را با طرح آماده استاندارد یا طرح اختصاصی خودتان از طریق بخش اسکین‌های اختصاصی دی‌جی‌گیر شخصی‌سازی کنید."
+
+msgid "Configure Custom Skin"
+msgstr "پیکربندی اسکین اختصاصی"
+
+msgid "Order through Custom Skins Portal"
+msgstr "سفارش از طریق بخش اسکین‌های اختصاصی"
+
+msgid "Select your DJ device model, finish, and Standard or Custom Design plan in the dedicated Custom Skins workflow."
+msgstr "مدل دستگاه دی‌جی، طرح و پلن استاندارد یا طراحی اختصاصی را در فرآیند اختصاصی سفارش اسکین انتخاب کنید."
+
+msgid "Custom DJ Equipment Skins"
+msgstr "اسکین‌های اختصاصی تجهیزات دی‌جی"
+
+msgid "Explore compatible DJ devices and custom skin finishes in the DJGear Custom Skins portal."
+msgstr "دستگاه‌های سازگار و طرح‌های اسکین اختصاصی را در بخش اسکین‌های دی‌جی‌گیر مشاهده کنید."
+
+msgid "Expand product image"
+msgstr "بزرگ‌نمایی تصویر محصول"
+
+msgid "Product image unavailable"
+msgstr "تصویر محصول در دسترس نیست"
+
+msgid "Product image thumbnails"
+msgstr "تصاویر کوچک محصول"
+
+msgid "Show product image %d"
+msgstr "نمایش تصویر %d محصول"
+
+msgid "Expanded product image"
+msgstr "نمای بزرگ تصویر محصول"
+
+msgid "Close image viewer"
+msgstr "بستن نمایشگر تصویر"
+
+msgid "Rated %s out of 5"
+msgstr "امتیاز %s از ۵"
+
+msgid "(%s review)"
+msgid_plural "(%s reviews)"
+msgstr[0] "(%s دیدگاه)"
+msgstr[1] "(%s دیدگاه)"
+
+msgid "Compatible DJ equipment"
+msgstr "تجهیزات دی‌جی سازگار"
+
+msgid "Compatible DJ Equipment"
+msgstr "تجهیزات دی‌جی سازگار"
+
+msgid "SKU"
+msgstr "شناسه کالا (SKU)"
+
+msgid "N/A"
+msgstr "نامشخص"
+
+msgid "Tags"
+msgstr "برچسب‌ها"
+
+msgid "Product details and reviews"
+msgstr "جزئیات محصول و دیدگاه‌ها"
+
+msgid "YOU MAY ALSO LIKE"
+msgstr "محصولات مشابه"
+
+msgid "Related DJ equipment"
+msgstr "تجهیزات مرتبط دی‌جی"
